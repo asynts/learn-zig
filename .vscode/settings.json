@@ -1,0 +1,13 @@
+{
+    "files.insertFinalNewline": true,
+    "files.trimTrailingWhitespace": true,
+
+    "files.exclude": {
+        ".git/": true,
+        "zig-cache/": true,
+        "zig-out/": true,
+    },
+
+    "editor.detectIndentation": false,
+    "editor.tabSize": 4,
+}
