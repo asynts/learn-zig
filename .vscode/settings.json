@@ -1,4 +1,6 @@
 {
+    "zls.zig_exe_path": "/home/me/.local/lib/zig-trunk/bin/zig",
+
     "files.insertFinalNewline": true,
     "files.trimTrailingWhitespace": true,
 
