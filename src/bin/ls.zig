@@ -7,23 +7,8 @@ const allocator = gpa.allocator();
 const Config = struct {
     path_relative: []const u8,
     b_show_hidden_files: bool,
-    b_hide_dot_dot_override: bool,
+    b_show_dot_dot: bool,
 };
-
-// FIXME: Why doesn't this function exist in 'std.ascii'?
-fn stringStartsWith(haystack: []const u8, needle: []const u8) bool {
-    return if (needle.len > haystack.len) false else stringEqual(haystack[0..needle.len], needle);
-}
-
-// FIXME: How to do this without defining a function?
-fn stringEqual(lhs: []const u8, rhs: []const u8) bool {
-    if (lhs.len != rhs.len) {
-        return false;
-    }
-
-    // FIXME: This doesn't compile?
-    return lhs[0..rhs.len] == rhs[0..rhs.len];
-}
 
 fn ls_command(config: Config) !u8 {
     var path_absolute = try std.fs.realpathAlloc(allocator, config.path_relative);
@@ -35,13 +20,16 @@ fn ls_command(config: Config) !u8 {
     });
     defer path_directory.close();
 
+    if (config.b_show_dot_dot) {
+        std.debug.print(".\n", .{});
+        std.debug.print("..\n", .{});
+    }
+
     var iterator = path_directory.iterate();
     while (try iterator.next()) |entry| {
-        var b_hidden_file = stringStartsWith(entry.name, ".");
-        var b_dot_dot = (stringEqual(entry.name, ".") or stringEqual(entry.name, ".."));
-
-        if (b_hidden_file and config.b_show_hidden_files) {
-            if (!b_dot_dot or !config.b_hide_dot_dot_override) {
+        if (!config.b_show_hidden_files) {
+            var is_hidden_file = std.mem.startsWith(u8, entry.name, ".");
+            if (is_hidden_file) {
                 continue;
             }
         }
@@ -65,28 +53,29 @@ pub fn main() !u8 {
     try root_cmd.addArg(yazap.flag.boolean("all", 'a', "do not ignore entries starting with ."));
     try root_cmd.addArg(yazap.flag.boolean("almost-all", 'A', "do not list implied . and .."));
 
+    // FIXME: This is not what I want.
+    //        Use positional argument instead.
     try root_cmd.addArg(yazap.flag.argOne("file", 'f', null));
 
     var args = try app.parseProcess();
 
     var config = Config{
         .b_show_hidden_files = false,
-        .b_hide_dot_dot_override = false,
+        .b_show_dot_dot = false,
         .path_relative = ".",
     };
 
     if (args.isPresent("all")) {
         config.b_show_hidden_files = true;
+        config.b_show_dot_dot = true;
     }
     if (args.isPresent("almost-all")) {
-        config.b_hide_dot_dot_override = true;
+        config.b_show_hidden_files = true;
+        config.b_show_dot_dot = false;
     }
     if (args.valueOf("file")) |filepath| {
-        // FIXME: Do we have to free this value?
         config.path_relative = filepath;
     }
-
-    std.debug.print("{any}\n", .{ config });
 
     return try ls_command(config);
 }
