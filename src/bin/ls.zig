@@ -112,6 +112,9 @@ pub fn main() !u8 {
 
     var args = try app.parseProcess();
 
+    // FIXME: This doesn't work for '--help'.
+    app.command_help.?.options.apply(.include_flags);
+
     var config = LsCommandConfig{
         .b_show_hidden_files = false,
         .b_show_dot_dot = false,
@@ -133,8 +136,6 @@ pub fn main() !u8 {
     if (args.valueOf("file")) |filepath| {
         config.dirpathRelative = filepath;
     }
-
-    // FIXME: Add proper '--help' page that lists options.
 
     return try lsCommand(config);
 }
