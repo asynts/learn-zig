@@ -53,9 +53,7 @@ pub fn main() !u8 {
     try root_cmd.addArg(yazap.flag.boolean("all", 'a', "do not ignore entries starting with ."));
     try root_cmd.addArg(yazap.flag.boolean("almost-all", 'A', "do not list implied . and .."));
 
-    // FIXME: This is not what I want.
-    //        Use positional argument instead.
-    try root_cmd.addArg(yazap.flag.argOne("file", 'f', null));
+    try root_cmd.takesSingleValue("file");
 
     var args = try app.parseProcess();
 
