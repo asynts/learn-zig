@@ -1,5 +1,6 @@
 const std = @import("std");
-const yazap = @import("yazap");
+
+const argument_parser = @import("../argument_parser.zig");
 
 var gpa = std.heap.GeneralPurposeAllocator(.{}){};
 const allocator = gpa.allocator();
@@ -99,21 +100,27 @@ pub fn main() !u8 {
     // If we called it at the end of 'main' it would run too early.
     defer _ = gpa.detectLeaks();
 
-    var app = yazap.Yazap.init(allocator, "ls", "List directory contents");
-    defer app.deinit();
+    var parser = argument_parser.ArgumentParser.init();
 
-    var root_cmd = app.rootCommand();
+    try parser.add_argument(argument_parser.Argument{
+        .name = "all",
+        .short_name = 'a',
+        .type_ = argument_parser.ArgumentType.boolean,
+    });
+    try parser.add_argument(argument_parser.Argument{
+        .name = "almost-all",
+        .short_name = null,
+        .type_ = argument_parser.ArgumentType.boolean,
+    });
+    try parser.add_argument(argument_parser.Argument{
+        .name = "list",
+        .short_name = 'l',
+        .type_ = argument_parser.ArgumentType.boolean,
+    });
 
-    try root_cmd.addArg(yazap.flag.boolean("all", 'a', "do not ignore entries starting with ."));
-    try root_cmd.addArg(yazap.flag.boolean("almost-all", 'A', "do not list implied . and .."));
-    try root_cmd.addArg(yazap.flag.boolean("list", 'l', "use long listing format"));
+    try parser.add_positional_argument("file");
 
-    try root_cmd.takesSingleValue("file");
-
-    var args = try app.parseProcess();
-
-    // FIXME: This doesn't work for '--help'.
-    app.command_help.?.options.apply(.include_flags);
+    var args = parser.parse();
 
     var config = LsCommandConfig{
         .b_show_hidden_files = false,
@@ -122,18 +129,18 @@ pub fn main() !u8 {
         .dirpathRelative = ".",
     };
 
-    if (args.isPresent("all")) {
+    if (args.isFlagSet("all")) {
         config.b_show_hidden_files = true;
         config.b_show_dot_dot = true;
     }
-    if (args.isPresent("almost-all")) {
+    if (args.isFlagSet("almost-all")) {
         config.b_show_hidden_files = true;
         config.b_show_dot_dot = false;
     }
-    if (args.isPresent("list")) {
+    if (args.isFlagSet("list")) {
         config.b_long_listing_format = true;
     }
-    if (args.valueOf("file")) |filepath| {
+    if (args.getStringValue("file")) |filepath| {
         config.dirpathRelative = filepath;
     }
 
