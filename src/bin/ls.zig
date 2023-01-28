@@ -1,6 +1,6 @@
 const std = @import("std");
 
-const argument_parser = @import("../argument_parser.zig");
+const argument_parser = @import("../argparse.zig");
 
 var gpa = std.heap.GeneralPurposeAllocator(.{}){};
 const allocator = gpa.allocator();
