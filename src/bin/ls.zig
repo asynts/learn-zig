@@ -45,9 +45,13 @@ fn getPermissionsString(metadata: std.fs.File.Metadata) [9:0]u8 {
 
 // FIXME: Don't use 'std.debug.print'?
 
+const FileFilterEnum = enum {
+    only_visible_files,
+    only_hidden_files,
+    all_files,
+};
 const LsCommandConfig = struct {
-    b_hide_hidden_files: bool,
-    b_hide_dot_dot_files: bool,
+    file_filter: FileFilterEnum,
     b_use_list_format: bool,
     dirpathRelative: []const u8,
 };
@@ -68,7 +72,7 @@ fn lsCommand(config: LsCommandConfig) !u8 {
     });
     defer dirHandle.close();
 
-    if (!config.b_hide_dot_dot_files) {
+    if (config.file_filter == .all_files) {
         std.debug.print(".\n", .{});
         std.debug.print("..\n", .{});
     }
@@ -76,7 +80,7 @@ fn lsCommand(config: LsCommandConfig) !u8 {
     var iterator = dirHandle.iterate();
     while (try iterator.next()) |entry| {
         // Maybe skip hidden files.
-        if (config.b_hide_hidden_files) {
+        if (config.file_filter == .only_visible_files) {
             var is_hidden_file = std.mem.startsWith(u8, entry.name, ".");
             if (is_hidden_file) {
                 continue;
@@ -110,7 +114,7 @@ fn debugPrintHashMap(description: []const u8, hashmap: *const std.StringHashMap(
 
     std.debug.print("{s}={{", .{ description });
     while (iterator.next()) |entry| {
-        std.debug.print("{s}: ", .{ entry.key_ptr.* });
+        std.debug.print("'{s}': ", .{ entry.key_ptr.* });
 
         switch (entry.value_ptr.*) {
             .boolean => |value| std.debug.print("{any}, ", .{ value }),
@@ -133,23 +137,19 @@ pub fn main() !u8 {
     //        I could use the call oder and assert.
 
     try parser.add_option(
-        "hide_hidden_files",
-        .store_false,
+        .store_true,
         "--all",
     );
     try parser.add_option(
-        "hide_dot_dot_files",
         .store_true,
         "--almost-all",
     );
     try parser.add_option(
-        "use_list_format",
         .store_true,
         "--list",
     );
 
     try parser.add_positional_argument(
-        "file",
         .store_string,
         "[file]",
     );
@@ -160,26 +160,35 @@ pub fn main() !u8 {
     // FIXME: What is 'namespace.declare()' for?
 
     // FIXME: Find better way to define default values.
-    try namespace.values.put("hide_hidden_files", .{ .boolean = true });
-    try namespace.values.put("hide_dot_dot_files", .{ .boolean = false });
-    try namespace.values.put("use_list_format", .{ .boolean = false });
-    try namespace.values.put("file", .{ .string = "." });
-
-    debugPrintHashMap("namespace_default", &namespace.values);
+    try namespace.values.put("--all", .{ .boolean = false });
+    try namespace.values.put("--almost-all", .{ .boolean = false });
+    try namespace.values.put("--list", .{ .boolean = false });
+    try namespace.values.put("[file]", .{ .string = "." });
 
     var argv = try std.process.argsAlloc(allocator);
     defer std.process.argsFree(allocator, argv);
 
     try parser.parse(&namespace, argv, std.io.getStdOut());
 
-    debugPrintHashMap("namespace_after_parse", &namespace.values);
-
     var config = LsCommandConfig{
-        // FIXME: Can I turn this into a member function?
-        .b_hide_hidden_files = try argparse.Namespace.get(bool, &namespace, "hide_hidden_files"),
-        .b_hide_dot_dot_files = try argparse.Namespace.get(bool, &namespace, "hide_dot_dot_files"),
-        .b_use_list_format = try argparse.Namespace.get(bool, &namespace, "use_list_format"),
-        .dirpathRelative = try argparse.Namespace.get([]const u8, &namespace, "file"),
+        .file_filter = .only_visible_files,
+        .b_use_list_format = false,
+        .dirpathRelative = ".",
     };
+
+    // FIXME: Use 'orelse' here?
+    // FIXME: Can I turn this into a member function?
+    if (try argparse.Namespace.get(bool, &namespace, "--all")) {
+        config.file_filter = .all_files;
+    }
+    if (try argparse.Namespace.get(bool, &namespace, "--almost-all")) {
+        config.file_filter = .only_hidden_files;
+    }
+    if (try argparse.Namespace.get(bool, &namespace, "--list")) {
+        config.b_use_list_format = true;
+    }
+
+    config.dirpathRelative = try argparse.Namespace.get([]const u8, &namespace, "[file]");
+
     return try lsCommand(config);
 }

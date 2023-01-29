@@ -52,8 +52,7 @@ pub const Namespace = struct {
     }
 };
 
-// FIXME: Consider splitting this into two enums.
-//        One for positional arguments, the other for options.
+// FIXME: Add 'store_string_list'.
 pub const ActionEnum = enum {
     store_true,
     store_false,
@@ -61,13 +60,10 @@ pub const ActionEnum = enum {
 };
 
 const Option = struct {
-    key_name: []const u8,
     action: ActionEnum,
-
-    long_name: []const u8,
+    name: []const u8,
 };
 const PositionalArgument = struct {
-    key_name: []const u8,
     action: ActionEnum,
     name: []const u8,
 };
@@ -77,8 +73,8 @@ pub const Parser = struct {
 
     allocator: std.mem.Allocator,
 
-    // Uses 'Option.long_name' as key.
-    options: std.StringHashMap(Option),
+    // Uses 'Option.name' as key.
+    long_options: std.StringHashMap(Option),
 
     positional_arguments: std.ArrayList(PositionalArgument),
 
@@ -89,18 +85,17 @@ pub const Parser = struct {
         return Self{
             .allocator = allocator,
 
-            .options = std.StringHashMap(Option).init(allocator),
+            .long_options = std.StringHashMap(Option).init(allocator),
             .positional_arguments = std.ArrayList(PositionalArgument).init(allocator),
         };
     }
     pub fn deinit(self: *Self) void {
-        self.options.deinit();
+        self.long_options.deinit();
         self.positional_arguments.deinit();
     }
 
     pub fn add_option(
         self: *Self,
-        key_name: []const u8,
         action: ActionEnum,
         long_name: []const u8) !void
     {
@@ -110,22 +105,20 @@ pub const Parser = struct {
             .store_string => {},
         }
 
-        var optionEntry = try self.options.getOrPut(long_name);
+        var optionEntry = try self.long_options.getOrPut(long_name);
 
         if (optionEntry.found_existing) {
             @panic("option name already used by other option");
         }
 
         optionEntry.value_ptr.* = Option{
-            .key_name = key_name,
             .action = action,
-            .long_name = long_name,
+            .name = long_name,
         };
     }
 
     pub fn add_positional_argument(
         self: *Self,
-        key_name: []const u8,
         action: ActionEnum,
         name: []const u8) !void
     {
@@ -137,7 +130,6 @@ pub const Parser = struct {
         }
 
         try self.positional_arguments.append(PositionalArgument{
-            .key_name = key_name,
             .action = action,
             .name = name,
         });
@@ -164,18 +156,18 @@ pub const Parser = struct {
 
                 var long_name = try lexer.take();
 
-                if (self.options.get(long_name)) |option| {
+                if (self.long_options.get(long_name)) |option| {
                     switch (option.action) {
-                        .store_true => try namespace.values.put(option.key_name, Value{ .boolean = true }),
-                        .store_false => try namespace.values.put(option.key_name, Value{ .boolean = false }),
+                        .store_true => try namespace.values.put(option.name, Value{ .boolean = true }),
+                        .store_false => try namespace.values.put(option.name, Value{ .boolean = false }),
 
                         .store_string => {
                             var value = lexer.take() catch {
-                                try self._reportError(writer, "error: '{s}' not allowed without value", .{ option.long_name });
+                                try self._reportError(writer, "error: '{s}' not allowed without value", .{ option.name });
                                 return;
                             };
 
-                            try namespace.values.put(option.key_name, Value{
+                            try namespace.values.put(option.name, Value{
                                 .string = value,
                             });
                         },
@@ -196,7 +188,7 @@ pub const Parser = struct {
                 var value = try lexer.take();
                 switch (argument.action) {
                     .store_string => {
-                        try namespace.values.put(argument.key_name, Value{ .string = value });
+                        try namespace.values.put(argument.name, Value{ .string = value });
                         positional_argument_index += 1;
                     },
 
