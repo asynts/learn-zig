@@ -23,6 +23,7 @@ pub const Namespace = struct {
     pub fn init(allocator: std.mem.Allocator) Self {
         return Self{
             .values = std.StringHashMap(Value).init(allocator),
+            .program_name = null,
         };
     }
     pub fn deinit(self: *Self) void {
@@ -115,7 +116,7 @@ pub const Parser = struct {
             @panic("option name already used by other option");
         }
 
-        optionEntry.value_ptr = Option{
+        optionEntry.value_ptr.* = Option{
             .key_name = key_name,
             .action = action,
             .long_name = long_name,
@@ -151,25 +152,26 @@ pub const Parser = struct {
 
     // FIXME: Consider moving this into some executor class?
     pub fn parse(self: *const Self, namespace: *Namespace, argv: [][]const u8, writer: anytype) !void {
-        var lexer = Lexer{ argv };
+        var lexer = Lexer.init(argv);
+        defer lexer.deinit();
 
         namespace.program_name = try lexer.take();
 
-        var positional_argument_index = 0;
+        var positional_argument_index: usize = 0;
         while (!lexer.isEnd()) {
             if (lexer.hasLongOption()) {
                 // FIXME: Move this into a function like '_parseLongOption'.
 
-                var key = lexer.take().?;
+                var key = try lexer.take();
 
-                if (self.long_options.get(key)) |option| {
+                if (self.options.get(key)) |option| {
                     switch (option.action) {
                         .store_true => try namespace.values.put(key, Value{ .boolean = true }),
                         .store_false => try namespace.values.put(key, Value{ .boolean = false }),
 
                         .store_string => {
                             var value = lexer.take() catch {
-                                self._reportError(writer, "error: '{s}' not allowed without value", .{ option.long_name.? });
+                                try self._reportError(writer, "error: '{s}' not allowed without value", .{ option.long_name });
                                 return;
                             };
 
@@ -184,14 +186,14 @@ pub const Parser = struct {
 
                 // FIXME: Move this into a function like '_parsePositionalArgument'.
 
-                if (positional_argument_index >= self.positional_arguments.len) {
-                    self._reportError(writer, "error: unexpected positional argument", .{});
+                if (positional_argument_index >= self.positional_arguments.items.len) {
+                    try self._reportError(writer, "error: unexpected positional argument", .{});
                     return;
                 }
 
-                var argument = self.positional_arguments[positional_argument_index];
+                var argument = self.positional_arguments.items[positional_argument_index];
 
-                var value = lexer.take().?;
+                var value = try lexer.take();
                 switch (argument.action) {
                     .store_string => {
                         try namespace.values.put(argument.key_name, Value{ .string = value });
@@ -205,7 +207,9 @@ pub const Parser = struct {
     }
 
     pub fn parseFromSystem(self: *const Self, namespace: *Namespace) !void {
-        var argv = std.process.argsAlloc(self.allocator);
+        // FIXME: Oops, we return this after using it.
+        //        Use after free.
+        var argv = try std.process.argsAlloc(self.allocator);
         defer self.allocator.free(argv);
 
         try self.parse(namespace, argv, std.io.getStdOut());
@@ -224,9 +228,12 @@ const Lexer = struct {
             .offset = 0,
         };
     }
+    fn deinit(self: *Self) void {
+        _ = self;
+    }
 
     fn isEnd(self: *const Self) bool {
-        return self.offset < self.argv.len;
+        return self.offset >= self.argv.len;
     }
 
     fn hasLongOption(self: *const Self) bool {
@@ -234,7 +241,7 @@ const Lexer = struct {
             return false;
         }
 
-        return std.mem.startsWith(u8, self.peek().?, "--");
+        return std.mem.startsWith(u8, self.peek() catch unreachable, "--");
     }
 
     fn peek(self: *const Self) ![]const u8 {

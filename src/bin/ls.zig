@@ -44,10 +44,10 @@ fn getPermissionsString(metadata: std.fs.File.Metadata) [9:0]u8 {
 }
 
 const LsCommandConfig = struct {
+    b_hide_hidden_files: bool,
+    b_hide_dot_dot_files: bool,
+    b_use_list_format: bool,
     dirpathRelative: []const u8,
-    b_show_hidden_files: bool,
-    b_show_dot_dot: bool,
-    b_long_listing_format: bool,
 };
 fn lsCommand(config: LsCommandConfig) !u8 {
     var dirpathAbsolute = try std.fs.realpathAlloc(allocator, config.dirpathRelative);
@@ -59,7 +59,7 @@ fn lsCommand(config: LsCommandConfig) !u8 {
     });
     defer dirHandle.close();
 
-    if (config.b_show_dot_dot) {
+    if (!config.b_hide_dot_dot_files) {
         std.debug.print(".\n", .{});
         std.debug.print("..\n", .{});
     }
@@ -67,14 +67,14 @@ fn lsCommand(config: LsCommandConfig) !u8 {
     var iterator = dirHandle.iterate();
     while (try iterator.next()) |entry| {
         // Maybe skip hidden files.
-        if (!config.b_show_hidden_files) {
+        if (config.b_hide_hidden_files) {
             var is_hidden_file = std.mem.startsWith(u8, entry.name, ".");
             if (is_hidden_file) {
                 continue;
             }
         }
 
-        if (config.b_long_listing_format) {
+        if (config.b_use_list_format) {
             var filepathAbsolute = try std.fs.path.join(allocator, &[_][]const u8{ dirpathAbsolute, entry.name });
             defer allocator.free(filepathAbsolute);
 
@@ -101,6 +101,7 @@ pub fn main() !u8 {
     defer _ = gpa.detectLeaks();
 
     var parser = argparse.Parser.init(allocator);
+    defer parser.deinit();
 
     // FIXME: Default values in options?
     //        That would not work if multiple options refer to the same.
@@ -128,23 +129,25 @@ pub fn main() !u8 {
         "[file]",
     );
 
-    var args = argparse.Namespace.init(allocator);
-    defer argparse.Namespace.deinit(args);
+    var namespace = argparse.Namespace.init(allocator);
+    defer namespace.deinit();
+
+    // FIXME: What is 'namespace.declare()' for?
 
     // FIXME: Find better way to define default values.
-    args.values.put("hide_hidden_files", .{ .boolean = true });
-    args.values.put("hide_dot_dot_files", .{ .boolean = false });
-    args.values.put("use_list_format", .{ .boolean = false });
-    args.values.put("file", .{ .string = "." });
+    try namespace.values.put("hide_hidden_files", .{ .boolean = true });
+    try namespace.values.put("hide_dot_dot_files", .{ .boolean = false });
+    try namespace.values.put("use_list_format", .{ .boolean = false });
+    try namespace.values.put("file", .{ .string = "." });
 
-    try parser.parse(args);
+    try parser.parseFromSystem(&namespace);
 
     var config = LsCommandConfig{
         // FIXME: Can I turn this into a member function?
-        .b_hide_hidden_files = argparse.Namespace.get(bool, args, "hide_hidden_files"),
-        .b_hide_dot_dot_files = argparse.Namespace.get(bool, args, "hide_dot_dot_files"),
-        .b_use_list_format = argparse.Namespace.get(bool, args, "use_list_format"),
-        .dirpathRelative = argparse.Namespace.get([]const u8, args, "file"),
+        .b_hide_hidden_files = try argparse.Namespace.get(bool, &namespace, "hide_hidden_files"),
+        .b_hide_dot_dot_files = try argparse.Namespace.get(bool, &namespace, "hide_dot_dot_files"),
+        .b_use_list_format = try argparse.Namespace.get(bool, &namespace, "use_list_format"),
+        .dirpathRelative = try argparse.Namespace.get([]const u8, &namespace, "file"),
     };
     return try lsCommand(config);
 }
