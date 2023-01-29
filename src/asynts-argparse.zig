@@ -205,15 +205,6 @@ pub const Parser = struct {
             }
         }
     }
-
-    pub fn parseFromSystem(self: *const Self, namespace: *Namespace) !void {
-        // FIXME: Oops, we return this after using it.
-        //        Use after free.
-        var argv = try std.process.argsAlloc(self.allocator);
-        defer self.allocator.free(argv);
-
-        try self.parse(namespace, argv, std.io.getStdOut());
-    }
 };
 
 const Lexer = struct {

@@ -43,6 +43,8 @@ fn getPermissionsString(metadata: std.fs.File.Metadata) [9:0]u8 {
     return permissionsString;
 }
 
+// FIXME: Don't use 'std.debug.print'?
+
 const LsCommandConfig = struct {
     b_hide_hidden_files: bool,
     b_hide_dot_dot_files: bool,
@@ -50,7 +52,14 @@ const LsCommandConfig = struct {
     dirpathRelative: []const u8,
 };
 fn lsCommand(config: LsCommandConfig) !u8 {
-    var dirpathAbsolute = try std.fs.realpathAlloc(allocator, config.dirpathRelative);
+    var dirpathAbsolute = std.fs.realpathAlloc(allocator, config.dirpathRelative) catch |err| {
+        if (err == error.FileNotFound) {
+            std.debug.print("error: file not found\n", .{});
+            return 1;
+        } else {
+            return err;
+        }
+    };
     defer allocator.free(dirpathAbsolute);
 
     var dirHandle = try std.fs.openIterableDirAbsolute(dirpathAbsolute, .{
@@ -140,7 +149,10 @@ pub fn main() !u8 {
     try namespace.values.put("use_list_format", .{ .boolean = false });
     try namespace.values.put("file", .{ .string = "." });
 
-    try parser.parseFromSystem(&namespace);
+    var argv = try std.process.argsAlloc(allocator);
+    defer std.process.argsFree(allocator, argv);
+
+    try parser.parse(&namespace, argv, std.io.getStdOut());
 
     var config = LsCommandConfig{
         // FIXME: Can I turn this into a member function?
