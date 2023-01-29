@@ -15,7 +15,7 @@ pub fn build(b: *std.build.Builder) void {
     exe.setTarget(target);
     exe.setBuildMode(mode);
 
-    exe.addPackagePath("yazap", "libs/yazap/src/lib.zig");
+    exe.addPackagePath("asynts-argparse", "src/asynts-argparse.zig");
 
     exe.install();
 

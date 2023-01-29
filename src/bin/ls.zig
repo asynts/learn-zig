@@ -1,6 +1,6 @@
 const std = @import("std");
 
-const argument_parser = @import("../argparse.zig");
+const argparse = @import("asynts-argparse");
 
 var gpa = std.heap.GeneralPurposeAllocator(.{}){};
 const allocator = gpa.allocator();
@@ -100,49 +100,51 @@ pub fn main() !u8 {
     // If we called it at the end of 'main' it would run too early.
     defer _ = gpa.detectLeaks();
 
-    var parser = argument_parser.ArgumentParser.init();
+    var parser = argparse.Parser.init(allocator);
 
-    try parser.add_argument(argument_parser.Argument{
-        .name = "all",
-        .short_name = 'a',
-        .type_ = argument_parser.ArgumentType.boolean,
-    });
-    try parser.add_argument(argument_parser.Argument{
-        .name = "almost-all",
-        .short_name = null,
-        .type_ = argument_parser.ArgumentType.boolean,
-    });
-    try parser.add_argument(argument_parser.Argument{
-        .name = "list",
-        .short_name = 'l',
-        .type_ = argument_parser.ArgumentType.boolean,
-    });
+    // FIXME: Default values in options?
+    //        That would not work if multiple options refer to the same.
+    //        I could use the call oder and assert.
 
-    try parser.add_positional_argument("file");
+    try parser.add_option(
+        "hide_hidden_files",
+        .store_false,
+        "--all",
+    );
+    try parser.add_option(
+        "hide_dot_dot_files",
+        .store_true,
+        "--almost-all",
+    );
+    try parser.add_option(
+        "use_list_format",
+        .store_true,
+        "--list",
+    );
 
-    var args = parser.parse();
+    try parser.add_positional_argument(
+        "file",
+        .store_string,
+        "[file]",
+    );
+
+    var args = argparse.Namespace.init(allocator);
+    defer argparse.Namespace.deinit(args);
+
+    // FIXME: Find better way to define default values.
+    args.values.put("hide_hidden_files", .{ .boolean = true });
+    args.values.put("hide_dot_dot_files", .{ .boolean = false });
+    args.values.put("use_list_format", .{ .boolean = false });
+    args.values.put("file", .{ .string = "." });
+
+    try parser.parse(args);
 
     var config = LsCommandConfig{
-        .b_show_hidden_files = false,
-        .b_show_dot_dot = false,
-        .b_long_listing_format = false,
-        .dirpathRelative = ".",
+        // FIXME: Can I turn this into a member function?
+        .b_hide_hidden_files = argparse.Namespace.get(bool, args, "hide_hidden_files"),
+        .b_hide_dot_dot_files = argparse.Namespace.get(bool, args, "hide_dot_dot_files"),
+        .b_use_list_format = argparse.Namespace.get(bool, args, "use_list_format"),
+        .dirpathRelative = argparse.Namespace.get([]const u8, args, "file"),
     };
-
-    if (args.isFlagSet("all")) {
-        config.b_show_hidden_files = true;
-        config.b_show_dot_dot = true;
-    }
-    if (args.isFlagSet("almost-all")) {
-        config.b_show_hidden_files = true;
-        config.b_show_dot_dot = false;
-    }
-    if (args.isFlagSet("list")) {
-        config.b_long_listing_format = true;
-    }
-    if (args.getStringValue("file")) |filepath| {
-        config.dirpathRelative = filepath;
-    }
-
     return try lsCommand(config);
 }
