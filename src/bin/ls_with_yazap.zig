@@ -110,7 +110,7 @@ pub fn main() !u8 {
     // If we called it at the end of 'main' it would run too early.
     defer _ = gpa.detectLeaks();
 
-    var app = yazap.Yazap.init(allocator, "ls-with-yazap", "List files in directory");
+    var app = yazap.App.init(allocator, "ls-with-yazap", "List files in directory");
     defer app.deinit();
 
     var root_cmd = app.rootCommand();

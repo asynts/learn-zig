@@ -149,6 +149,10 @@ pub const Parser = struct {
         try writer.writeAll(message);
     }
 
+    // FIXME: Add 'parseFromSystem' method back in.
+    //        The allocated arguments can be kept in 'Namespace'.
+    //        Alternatively, I could duplicate the relevent memory.
+
     // FIXME: Consider moving this into some executor class?
     pub fn parse(self: *const Self, namespace: *Namespace, argv: [][]const u8, writer: anytype) !void {
         var lexer = Lexer.init(argv);
