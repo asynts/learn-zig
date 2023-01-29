@@ -36,3 +36,5 @@
         return;
     }
     ```
+
+-   What should I use instead of `std.debug.print` when I want to handle errors?

@@ -43,8 +43,6 @@ fn getPermissionsString(metadata: std.fs.File.Metadata) [9:0]u8 {
     return permissionsString;
 }
 
-// FIXME: Don't use 'std.debug.print'?
-
 const FileFilterEnum = enum {
     only_visible_files,
     only_hidden_files,
