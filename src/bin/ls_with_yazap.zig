@@ -7,39 +7,39 @@ const allocator = gpa.allocator();
 fn getPermissionsString(metadata: std.fs.File.Metadata) [9:0]u8 {
     var permissions = metadata.permissions().inner;
 
-    var permissionsString = "---------".*;
+    var permissions_string = "---------".*;
 
     if (permissions.unixHas(.user, .read)) {
-        permissionsString[0] = 'r';
+        permissions_string[0] = 'r';
     }
     if (permissions.unixHas(.user, .write)) {
-        permissionsString[1] = 'w';
+        permissions_string[1] = 'w';
     }
     if (permissions.unixHas(.user, .execute)) {
-        permissionsString[2] = 'x';
+        permissions_string[2] = 'x';
     }
 
     if (permissions.unixHas(.group, .read)) {
-        permissionsString[3] = 'r';
+        permissions_string[3] = 'r';
     }
     if (permissions.unixHas(.group, .write)) {
-        permissionsString[4] = 'w';
+        permissions_string[4] = 'w';
     }
     if (permissions.unixHas(.group, .execute)) {
-        permissionsString[5] = 'x';
+        permissions_string[5] = 'x';
     }
 
     if (permissions.unixHas(.other, .read)) {
-        permissionsString[6] = 'r';
+        permissions_string[6] = 'r';
     }
     if (permissions.unixHas(.other, .write)) {
-        permissionsString[7] = 'w';
+        permissions_string[7] = 'w';
     }
     if (permissions.unixHas(.other, .execute)) {
-        permissionsString[8] = 'x';
+        permissions_string[8] = 'x';
     }
 
-    return permissionsString;
+    return permissions_string;
 }
 
 const FileFilterEnum = enum {
@@ -47,13 +47,13 @@ const FileFilterEnum = enum {
     only_hidden_files,
     all_files,
 };
-const LsCommandConfig = struct {
+const ListFilesCommandConfig = struct {
     file_filter: FileFilterEnum,
     b_use_list_format: bool,
-    dirpathRelative: []const u8,
+    dirpath_relative: []const u8,
 };
-fn lsCommand(config: LsCommandConfig) !u8 {
-    var dirpathAbsolute = std.fs.realpathAlloc(allocator, config.dirpathRelative) catch |err| {
+fn listFilesCommand(config: ListFilesCommandConfig) !u8 {
+    var dirpath_absolute = std.fs.realpathAlloc(allocator, config.dirpath_relative) catch |err| {
         if (err == error.FileNotFound) {
             std.debug.print("error: file not found\n", .{});
             return 1;
@@ -61,20 +61,20 @@ fn lsCommand(config: LsCommandConfig) !u8 {
             return err;
         }
     };
-    defer allocator.free(dirpathAbsolute);
+    defer allocator.free(dirpath_absolute);
 
-    var dirHandle = try std.fs.openIterableDirAbsolute(dirpathAbsolute, .{
+    var dir_handle = try std.fs.openIterableDirAbsolute(dirpath_absolute, .{
         .access_sub_paths = false,
         .no_follow = false,
     });
-    defer dirHandle.close();
+    defer dir_handle.close();
 
     if (config.file_filter == .all_files) {
         std.debug.print(".\n", .{});
         std.debug.print("..\n", .{});
     }
 
-    var iterator = dirHandle.iterate();
+    var iterator = dir_handle.iterate();
     while (try iterator.next()) |entry| {
         // Maybe skip hidden files.
         if (config.file_filter == .only_visible_files) {
@@ -85,16 +85,16 @@ fn lsCommand(config: LsCommandConfig) !u8 {
         }
 
         if (config.b_use_list_format) {
-            var filepathAbsolute = try std.fs.path.join(allocator, &[_][]const u8{ dirpathAbsolute, entry.name });
-            defer allocator.free(filepathAbsolute);
+            var filepath_absolute = try std.fs.path.join(allocator, &[_][]const u8{ dirpath_absolute, entry.name });
+            defer allocator.free(filepath_absolute);
 
-            var fileHandle = try std.fs.openFileAbsolute(filepathAbsolute, .{ .mode = .read_only });
-            defer fileHandle.close();
+            var file_handle = try std.fs.openFileAbsolute(filepath_absolute, .{ .mode = .read_only });
+            defer file_handle.close();
 
-            var fileMetadata = try fileHandle.metadata();
+            var file_metadata = try file_handle.metadata();
 
             std.debug.print("{s}  {s}\n", .{
-                getPermissionsString(fileMetadata),
+                getPermissionsString(file_metadata),
                 entry.name,
             });
         } else {
@@ -128,10 +128,10 @@ pub fn main() !u8 {
     var flag_list = args.isPresent("list");
     var arg_file = args.valueOf("file") orelse ".";
 
-    var config = LsCommandConfig{
+    var config = ListFilesCommandConfig{
         .file_filter = .only_visible_files,
         .b_use_list_format = false,
-        .dirpathRelative = undefined,
+        .dirpath_relative = undefined,
     };
 
     if (flag_all) {
@@ -144,7 +144,7 @@ pub fn main() !u8 {
         config.b_use_list_format = true;
     }
 
-    config.dirpathRelative = arg_file;
+    config.dirpath_relative = arg_file;
 
-    return try lsCommand(config);
+    return try listFilesCommand(config);
 }

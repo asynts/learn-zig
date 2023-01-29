@@ -9,6 +9,8 @@ pub const Value = union(ValueEnum) {
     string: []const u8,
 };
 
+// FIXME: Add usage page.
+
 // FIXME: Add error enum.
 
 // FIXME: What needs to be public?
@@ -30,7 +32,7 @@ pub const Namespace = struct {
         self.values.deinit();
     }
 
-    pub fn get(comptime T: type, self: *const Self, key: []const u8) !?T {
+    pub fn get(self: *const Self, comptime T: type, key: []const u8) !?T {
         var value_opt = self.values.get(key);
 
         // FIXME: How to check if optional is empty?
@@ -99,7 +101,7 @@ pub const Parser = struct {
         self.positional_arguments.deinit();
     }
 
-    pub fn add_option(
+    pub fn addOption(
         self: *Self,
         action: ActionEnum,
         long_name: []const u8) !void
@@ -122,7 +124,7 @@ pub const Parser = struct {
         };
     }
 
-    pub fn add_positional_argument(
+    pub fn addPositionalArgument(
         self: *Self,
         action: ActionEnum,
         name: []const u8) !void

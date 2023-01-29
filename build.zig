@@ -7,10 +7,10 @@ pub fn build(b: *std.build.Builder) void {
     var ls_exe = b.addExecutable("ls", "src/bin/ls.zig");
     ls_exe.setTarget(target);
     ls_exe.setBuildMode(mode);
-    ls_exe.addPackagePath("asynts-argparse", "src/asynts-argparse.zig");
+    ls_exe.addPackagePath("asynts-argparse", "src/asynts_argparse.zig");
     ls_exe.install();
 
-    var ls_with_yazap_exe = b.addExecutable("ls-with-yazap", "src/bin/ls-with-yazap.zig");
+    var ls_with_yazap_exe = b.addExecutable("ls-with-yazap", "src/bin/ls_with_yazap.zig");
     ls_with_yazap_exe.setTarget(target);
     ls_with_yazap_exe.setBuildMode(mode);
     ls_with_yazap_exe.addPackagePath("yazap", "libs/yazap/src/lib.zig");

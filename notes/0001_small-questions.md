@@ -15,6 +15,9 @@
 
 -   What are the general naming conventions for `snake_case` and `camelCase`?
 
+    Answer: There is an official style guide: https://ziglang.org/documentation/0.10.1/#Style-Guide
+    This was pointed out by Prajwal here: https://github.com/asynts/learn-zig/commit/0daee1ebc4bd6cbd5345bf96378e1aaef778c916#r98425724
+
 -   I don't like `anytype`.
     Concepts were added to C++ for a reason.
 
