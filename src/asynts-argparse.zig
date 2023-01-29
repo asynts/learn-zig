@@ -30,12 +30,17 @@ pub const Namespace = struct {
         self.values.deinit();
     }
 
-    pub fn declare(self: *Self, key: []const u8, default_value: Value) !void {
-        try self.values.put(key, default_value);
-    }
+    pub fn get(comptime T: type, self: *const Self, key: []const u8) !?T {
+        var value_opt = self.values.get(key);
 
-    pub fn get(comptime T: type, self: *const Self, key: []const u8) !T {
-        switch (self.values.get(key).?) {
+        // FIXME: How to check if optional is empty?
+        if (value_opt) |_| {
+
+        } else {
+            return null;
+        }
+
+        switch (value_opt.?) {
             .string => |value| {
                 if (T == []const u8) {
                     return value;

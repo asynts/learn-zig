@@ -132,10 +132,6 @@ pub fn main() !u8 {
     var parser = argparse.Parser.init(allocator);
     defer parser.deinit();
 
-    // FIXME: Default values in options?
-    //        That would not work if multiple options refer to the same.
-    //        I could use the call oder and assert.
-
     try parser.add_option(
         .store_true,
         "--all",
@@ -148,7 +144,6 @@ pub fn main() !u8 {
         .store_true,
         "--list",
     );
-
     try parser.add_positional_argument(
         .store_string,
         "[file]",
@@ -157,38 +152,33 @@ pub fn main() !u8 {
     var namespace = argparse.Namespace.init(allocator);
     defer namespace.deinit();
 
-    // FIXME: What is 'namespace.declare()' for?
-
-    // FIXME: Find better way to define default values.
-    try namespace.values.put("--all", .{ .boolean = false });
-    try namespace.values.put("--almost-all", .{ .boolean = false });
-    try namespace.values.put("--list", .{ .boolean = false });
-    try namespace.values.put("[file]", .{ .string = "." });
-
     var argv = try std.process.argsAlloc(allocator);
     defer std.process.argsFree(allocator, argv);
 
     try parser.parse(&namespace, argv, std.io.getStdOut());
 
+    var flag_all = try argparse.Namespace.get(bool, &namespace, "--all") orelse false;
+    var flag_almost_all = try argparse.Namespace.get(bool, &namespace, "--almost-all") orelse false;
+    var flag_list = try argparse.Namespace.get(bool, &namespace, "--list") orelse false;
+    var arg_file = try argparse.Namespace.get([]const u8, &namespace, "[file]") orelse ".";
+
     var config = LsCommandConfig{
         .file_filter = .only_visible_files,
         .b_use_list_format = false,
-        .dirpathRelative = ".",
+        .dirpathRelative = undefined,
     };
 
-    // FIXME: Use 'orelse' here?
-    // FIXME: Can I turn this into a member function?
-    if (try argparse.Namespace.get(bool, &namespace, "--all")) {
+    if (flag_all) {
         config.file_filter = .all_files;
     }
-    if (try argparse.Namespace.get(bool, &namespace, "--almost-all")) {
+    if (flag_almost_all) {
         config.file_filter = .only_hidden_files;
     }
-    if (try argparse.Namespace.get(bool, &namespace, "--list")) {
+    if (flag_list) {
         config.b_use_list_format = true;
     }
 
-    config.dirpathRelative = try argparse.Namespace.get([]const u8, &namespace, "[file]");
+    config.dirpathRelative = arg_file;
 
     return try lsCommand(config);
 }

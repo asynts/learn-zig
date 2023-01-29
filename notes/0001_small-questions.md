@@ -17,3 +17,22 @@
 
 -   I don't like `anytype`.
     Concepts were added to C++ for a reason.
+
+-   How to check if an optional has a value without unwrapping it:
+
+    ```zig
+    if (foo_opt) |_| {
+        // something
+    }
+    ```
+
+    Or something like this:
+
+    ```zig
+    if (foo_opt) |_| {
+        // nothing
+    } else {
+        // Exit early if null.
+        return;
+    }
+    ```
