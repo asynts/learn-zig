@@ -1,5 +1,5 @@
 const std = @import("std");
-const argparse = @import("asynts-argparse");
+const yazap = @import("yazap");
 
 var gpa = std.heap.GeneralPurposeAllocator(.{}){};
 const allocator = gpa.allocator();
@@ -105,59 +105,28 @@ fn lsCommand(config: LsCommandConfig) !u8 {
     return 0;
 }
 
-// FIXME: There is probably something in the standard library for this?
-fn debugPrintHashMap(description: []const u8, hashmap: *const std.StringHashMap(argparse.Value)) void {
-    var iterator = hashmap.iterator();
-
-    std.debug.print("{s}={{", .{ description });
-    while (iterator.next()) |entry| {
-        std.debug.print("'{s}': ", .{ entry.key_ptr.* });
-
-        switch (entry.value_ptr.*) {
-            .boolean => |value| std.debug.print("{any}, ", .{ value }),
-            .string => |value| std.debug.print("'{s}', ", .{ value }),
-        }
-    }
-    std.debug.print("}}\n", .{});
-}
-
 pub fn main() !u8 {
     // We need to call this early since 'defer' statements are called in reverse order.
     // If we called it at the end of 'main' it would run too early.
     defer _ = gpa.detectLeaks();
 
-    var parser = argparse.Parser.init(allocator);
-    defer parser.deinit();
+    var app = yazap.Yazap.init(allocator, "ls-with-yazap", "List files in directory");
+    defer app.deinit();
 
-    try parser.add_option(
-        .store_true,
-        "--all",
-    );
-    try parser.add_option(
-        .store_true,
-        "--almost-all",
-    );
-    try parser.add_option(
-        .store_true,
-        "--list",
-    );
-    try parser.add_positional_argument(
-        .store_string,
-        "[file]",
-    );
+    var root_cmd = app.rootCommand();
 
-    var namespace = argparse.Namespace.init(allocator);
-    defer namespace.deinit();
+    try root_cmd.addArg(yazap.flag.boolean("all", 'a', "do not ignore entries starting with ."));
+    try root_cmd.addArg(yazap.flag.boolean("almost-all", 'A', "do not list implied . and .."));
+    try root_cmd.addArg(yazap.flag.boolean("list", 'l', "use long listing format"));
 
-    var argv = try std.process.argsAlloc(allocator);
-    defer std.process.argsFree(allocator, argv);
+    try root_cmd.takesSingleValue("file");
 
-    try parser.parse(&namespace, argv, std.io.getStdOut());
+    var args = try app.parseProcess();
 
-    var flag_all = try argparse.Namespace.get(bool, &namespace, "--all") orelse false;
-    var flag_almost_all = try argparse.Namespace.get(bool, &namespace, "--almost-all") orelse false;
-    var flag_list = try argparse.Namespace.get(bool, &namespace, "--list") orelse false;
-    var arg_file = try argparse.Namespace.get([]const u8, &namespace, "[file]") orelse ".";
+    var flag_all = args.isPresent("all");
+    var flag_almost_all = args.isPresent("almost-all");
+    var flag_list = args.isPresent("list");
+    var arg_file = args.valueOf("file") orelse ".";
 
     var config = LsCommandConfig{
         .file_filter = .only_visible_files,
