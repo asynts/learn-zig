@@ -104,6 +104,22 @@ fn lsCommand(config: LsCommandConfig) !u8 {
     return 0;
 }
 
+// FIXME: There is probably something in the standard library for this?
+fn debugPrintHashMap(description: []const u8, hashmap: *const std.StringHashMap(argparse.Value)) void {
+    var iterator = hashmap.iterator();
+
+    std.debug.print("{s}={{", .{ description });
+    while (iterator.next()) |entry| {
+        std.debug.print("{s}: ", .{ entry.key_ptr.* });
+
+        switch (entry.value_ptr.*) {
+            .boolean => |value| std.debug.print("{any}, ", .{ value }),
+            .string => |value| std.debug.print("'{s}', ", .{ value }),
+        }
+    }
+    std.debug.print("}}\n", .{});
+}
+
 pub fn main() !u8 {
     // We need to call this early since 'defer' statements are called in reverse order.
     // If we called it at the end of 'main' it would run too early.
@@ -149,10 +165,14 @@ pub fn main() !u8 {
     try namespace.values.put("use_list_format", .{ .boolean = false });
     try namespace.values.put("file", .{ .string = "." });
 
+    debugPrintHashMap("namespace_default", &namespace.values);
+
     var argv = try std.process.argsAlloc(allocator);
     defer std.process.argsFree(allocator, argv);
 
     try parser.parse(&namespace, argv, std.io.getStdOut());
+
+    debugPrintHashMap("namespace_after_parse", &namespace.values);
 
     var config = LsCommandConfig{
         // FIXME: Can I turn this into a member function?

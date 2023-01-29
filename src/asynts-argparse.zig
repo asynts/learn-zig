@@ -162,12 +162,12 @@ pub const Parser = struct {
             if (lexer.hasLongOption()) {
                 // FIXME: Move this into a function like '_parseLongOption'.
 
-                var key = try lexer.take();
+                var long_name = try lexer.take();
 
-                if (self.options.get(key)) |option| {
+                if (self.options.get(long_name)) |option| {
                     switch (option.action) {
-                        .store_true => try namespace.values.put(key, Value{ .boolean = true }),
-                        .store_false => try namespace.values.put(key, Value{ .boolean = false }),
+                        .store_true => try namespace.values.put(option.key_name, Value{ .boolean = true }),
+                        .store_false => try namespace.values.put(option.key_name, Value{ .boolean = false }),
 
                         .store_string => {
                             var value = lexer.take() catch {
@@ -175,7 +175,7 @@ pub const Parser = struct {
                                 return;
                             };
 
-                            try namespace.values.put(key, Value{
+                            try namespace.values.put(option.key_name, Value{
                                 .string = value,
                             });
                         },
