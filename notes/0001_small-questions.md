@@ -18,6 +18,14 @@
 
 -   What should I use instead of `std.debug.print` when I want to handle errors?
 
+-   How to return errors as values?
+
+    ```zig
+    fn createError() !error {
+        // ???
+    }
+    ```
+
 ### Closed
 
 -   What are the general naming conventions for `snake_case` and `camelCase`?
