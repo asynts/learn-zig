@@ -19,6 +19,10 @@ pub const Lexer = struct {
         return self.offset >= self.input.len;
     }
 
+    pub fn peek(self: *const Self) u8 {
+        return self.input[self.offset];
+    }
+
     pub fn consumeUntil(self: *Self, marker: u8) []const u8 {
         var start_offset = self.offset;
 
@@ -37,7 +41,7 @@ pub const Lexer = struct {
             return false;
         }
 
-        if (self.input[self.offset] == char) {
+        if (self.peek() == char) {
             self.offset += 1;
             return true;
         }
@@ -60,31 +64,47 @@ const Generator = struct {
         _ = self;
     }
 
-    // FIXME: Can we offload the parsing to compile time?
-    //        Essentially, this should be a sequence of 'TextPlacementInstruction' and 'VariablePlacementInstruction'.
-    //        Generating that at compile time should be possible?
+    // FIXME: I think a better approach would be to prepare a sequence of instructions at comptime that is executed at runtime.
+    //        With 'Literal' and 'VariableSubstitution' or something like that.
     pub fn run(self: *const Self, arguments: anytype, comptime inputTemplate: []const u8) ![]const u8 {
-        var lexer = Lexer.init(inputTemplate);
+        comptime var lexer = Lexer.init(inputTemplate);
 
         var buffer = std.ArrayList(u8).init(self.allocator);
         defer buffer.deinit();
 
         var writer = buffer.writer();
 
-        while (!lexer.isEnd()) {
-            var rawString = lexer.consumeUntil('{');
-            try writer.print("{s}", rawString);
+        // FIXME: This syntax is a huge mess, is there a better way to achieve this?
+        comptime var is_end = lexer.isEnd();
+        inline while (!is_end) {
+            comptime var raw_literal: []const u8 = undefined;
+            comptime {
+                raw_literal = lexer.consumeUntil('{');
+            }
+            try writer.print("{s}", .{ raw_literal });
 
-            if (lexer.consumeChar('{')) {
-                var variableName = lexer.consumeUntil('}');
+            comptime var opened_brace: bool = undefined;
+            comptime {
+                opened_brace = lexer.consumeChar('{');
+            }
+            if (opened_brace) {
+                comptime var variable_name = lexer.consumeUntil('}');
 
-                if (!lexer.consumeChar('}')) {
+                comptime var closed_brace: bool = undefined;
+                comptime {
+                    closed_brace = lexer.consumeChar('}');
+                }
+                if (!closed_brace) {
                     return error.SyntaxError;
                 }
 
                 // FIXME: How can I get 'variableName' at compile time here?
                 //        Look at how 'std.fmt.format' solves this issue.
-                try writer.print("{s}", @field(arguments, variableName));
+                try writer.print("{s}", .{ @field(arguments, variable_name) });
+            }
+
+            comptime {
+                is_end = lexer.isEnd();
             }
         }
 
