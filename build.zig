@@ -21,10 +21,15 @@ pub fn build(b: *std.build.Builder) void {
     asynts_template_lib.setBuildMode(mode);
     asynts_template_lib.install();
 
-    var tests = b.addTest("src/asynts_template/lib.zig");
-    tests.setTarget(target);
-    tests.setBuildMode(mode);
+    var tests_1 = b.addTest("src/asynts_template/lib.zig");
+    tests_1.setTarget(target);
+    tests_1.setBuildMode(mode);
+
+    var tests_2 = b.addTest("src/asynts_template/Parser.zig");
+    tests_2.setTarget(target);
+    tests_2.setBuildMode(mode);
 
     var test_step = b.step("test", "Run library tests");
-    test_step.dependOn(&tests.step);
+    test_step.dependOn(&tests_1.step);
+    test_step.dependOn(&tests_2.step);
 }

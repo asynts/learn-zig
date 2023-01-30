@@ -39,6 +39,9 @@
     I suspect that `orelse unreachable` is meant for that?
     Does that provide a proper error trace?
 
+-   What does `union(enum)` do?
+    Does this allow me to drop the redundant enums?
+
 ### Closed
 
 -   Question: What are the general naming conventions for `snake_case` and `camelCase`?
