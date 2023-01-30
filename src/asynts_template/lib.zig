@@ -64,6 +64,107 @@ pub const Generator = struct {
         _ = self;
     }
 
+    pub fn _parseTemplate(
+        comptime inputTemplate: []const u8,
+        comptime context: anytype,
+        comptime emitLiteral: fn (context: anytype, literal: []const u8) void,
+        comptime emitVariable: fn (context: anytype, name: []const u8) void,
+    ) !void {
+        // FIXME: Is it possible to mark the entire function as 'comptime'?
+        comptime {
+            var lexer = Lexer.init(inputTemplate);
+
+            while (!lexer.isEnd()) {
+                var raw_literal = lexer.consumeUntil('{');
+                if (raw_literal.len >= 1) {
+                    emitLiteral(raw_literal);
+                }
+
+                if (lexer.consumeChar('{')) {
+                    var variable_name = lexer.consumeUntil('}');
+                    emitVariable(variable_name);
+
+                    if (!lexer.consumeChar('}')) {
+                        return error.SyntaxError;
+                    }
+                }
+            }
+        }
+    }
+
+    pub fn runWithTypeErasure(self: *const Self, arguments: anytype, comptime inputTemplate: []const u8) ![]const u8 {
+        const InstructionType = enum {
+            emit_literal,
+            emit_variable,
+        };
+        const Instruction = struct (InstructionType) {
+            emit_literal: []const u8,
+            emit_variable: []const u8,
+        };
+
+        comptime var instructions = compute_instructions: {
+            // FIXME: We need to measure how many instructions there are.
+            //        In the future, we could use memory allocations here, but Zig doesn't yet support that.
+            var instructionCount: usize = 0;
+
+            fn reserveInstruction(instructionCountPtr: *usize, []const u8) void {
+                instructionCountPtr.* += 1;
+            }
+
+            self._parseTemplate(
+                inputTemplate,
+                &instructionCount,
+                reserveInstruciton,
+                reserveInstruction,
+            ) orelse unreachable;
+
+            const Context = struct {
+                instructions: [instructionCount]Instruction,
+                offset: usize,
+            };
+
+            var context = Context{
+                .instructions = undefined,
+                .offset = 0,
+            };
+
+            fn saveLiteral(context: *Context, literal: []const u8) void {
+                context.*.instructions[context.*.offset] = .{ .emit_literal = literal };
+                context.*.offset += 1;
+            }
+            fn saveVariable(context: *Context, variable_name: []const u8) void {
+                context.*.instructions[context.*.offset] = .{ .emit_variable = variable_name };
+                context.*.offset += 1;
+            }
+
+            self._parseTemplate(
+                inputTemplate,
+                &context,
+                saveLiteral,
+                saveVariable,
+            ) orelse unreachable;
+
+            break :compute_instructions context.instructions;
+        };
+
+        var buffer = std.ArrayList(u8).init(self.allocator);
+        defer buffer.deinit();
+
+        var writer = buffer.writer();
+
+        for (instructions) |instruction| {
+            switch (instruction) {
+                .emit_literal => |literal| {
+                    try writer.print("{s}", .{ literal });
+                },
+                .emit_variable => |variable_name| {
+                    // FIXME: I can't get the variable name here, fuck.
+                    //        The variables could be thrown into a tuple and accessed by index.
+                }
+            }
+        }
+    }
+
     // FIXME: I think a better approach would be to prepare a sequence of instructions at comptime that is executed at runtime.
     //        With 'Literal' and 'VariableSubstitution' or something like that.
     pub fn run(self: *const Self, arguments: anytype, comptime inputTemplate: []const u8) ![]const u8 {
@@ -99,23 +200,10 @@ test {
     var generator = Generator.init(allocator);
     defer generator.deinit();
 
-    var template = generator.run(
-        .{},
-        \\<div class="Page">
-        \\  <p>Hello, world!</p>
-        \\</div>
-        \\
-    ) catch unreachable;
-    defer allocator.free(template);
+    var output = generator.run(.{}, "Hello, world!") catch unreachable;
+    defer allocator.free(output);
 
-    try expect(std.mem.eql(
-        u8,
-        template,
-        \\<div class="Page">
-        \\  <p>Hello, world!</p>
-        \\</div>
-        \\
-    ));
+    try expect(std.mem.eql(u8, output, "Hello, world!"));
 }
 
 test {
@@ -124,25 +212,8 @@ test {
     var generator = Generator.init(allocator);
     defer generator.deinit();
 
-    var template = generator.run(
-        .{
-            .text = "Hi!"
-        },
-        \\<div class="Page">
-        \\  <p>{text}</p>
-        \\</div>
-        \\
-    ) catch unreachable;
-    defer allocator.free(template);
+    var output = generator.run(.{ .name = "Alice" }, "Hello, {name}!") catch unreachable;
+    defer allocator.free(output);
 
-    try expect(std.mem.eql(
-        u8,
-        template,
-        \\<div class="Page">
-        \\  <p>Hi!</p>
-        \\</div>
-        \\
-    ));
+    try expect(std.mem.eql(u8, output, "Hello, Alice!"));
 }
-
-// FIXME: Test: escape context dependent.

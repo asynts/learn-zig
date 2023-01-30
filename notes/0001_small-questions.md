@@ -30,36 +30,14 @@
 
 -   Can we use `comptime` functions to define constraints for type parameters?
 
--   How can we evaluate an expression in a condition with at comptime?
+-   Why do people make the `global_memory_allocator` a global variable?
+    I would put it into `main` instead?!
 
-    Example:
-    ```zig
-    comptime var condition: bool = undefined;
-    comptime {
-        condition = foo();
-    }
-    if (condition) {
-        // ...
-    }
-    ```
+-   Is it possible to mark an entire function as `comptime`?
 
-    I tried making the `self` parameter `comptime` for a struct:
-    ```zig
-    struct {
-        fn foo(comptime self: *Self) {
-            // ...
-        }
-    }
-    ```
-    However, that did not help.
-
-    Answer: Adding a `comptime` prefix works:
-
-    ```zig
-    if (comptime foo()) {
-        // ...
-    }
-    ```
+-   Is there anything like `@must` to unwrap an error or panic?
+    I suspect that `orelse unreachable` is meant for that?
+    Does that provide a proper error trace?
 
 ### Closed
 
@@ -74,5 +52,14 @@
     ```zig
     if (foo_opt == null) {
         return;
+    }
+    ```
+
+-   Question: How can we evaluate an expression in a condition with at comptime?
+
+    Answer: Adding a `comptime` prefix works:
+    ```zig
+    if (comptime foo()) {
+        // ...
     }
     ```
