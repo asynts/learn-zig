@@ -33,13 +33,30 @@
 -   How can we evaluate an expression in a condition with at comptime?
 
     Example:
-
     ```zig
     comptime var condition: bool = undefined;
     comptime {
         condition = foo();
     }
     if (condition) {
+        // ...
+    }
+    ```
+
+    I tried making the `self` parameter `comptime` for a struct:
+    ```zig
+    struct {
+        fn foo(comptime self: *Self) {
+            // ...
+        }
+    }
+    ```
+    However, that did not help.
+
+    Answer: Adding a `comptime` prefix works:
+
+    ```zig
+    if (comptime foo()) {
         // ...
     }
     ```

@@ -50,7 +50,7 @@ pub const Lexer = struct {
     }
 };
 
-const Generator = struct {
+pub const Generator = struct {
     const Self = @This();
 
     allocator: std.mem.Allocator,
@@ -74,37 +74,18 @@ const Generator = struct {
 
         var writer = buffer.writer();
 
-        // FIXME: This syntax is a huge mess, is there a better way to achieve this?
-        comptime var is_end = lexer.isEnd();
-        inline while (!is_end) {
-            comptime var raw_literal: []const u8 = undefined;
-            comptime {
-                raw_literal = lexer.consumeUntil('{');
-            }
+        inline while (comptime !lexer.isEnd()) {
+            comptime var raw_literal = lexer.consumeUntil('{');
             try writer.print("{s}", .{ raw_literal });
 
-            comptime var opened_brace: bool = undefined;
-            comptime {
-                opened_brace = lexer.consumeChar('{');
-            }
-            if (opened_brace) {
+            if (comptime lexer.consumeChar('{')) {
                 comptime var variable_name = lexer.consumeUntil('}');
 
-                comptime var closed_brace: bool = undefined;
-                comptime {
-                    closed_brace = lexer.consumeChar('}');
-                }
-                if (!closed_brace) {
+                if (comptime !lexer.consumeChar('}')) {
                     return error.SyntaxError;
                 }
 
-                // FIXME: How can I get 'variableName' at compile time here?
-                //        Look at how 'std.fmt.format' solves this issue.
                 try writer.print("{s}", .{ @field(arguments, variable_name) });
-            }
-
-            comptime {
-                is_end = lexer.isEnd();
             }
         }
 
