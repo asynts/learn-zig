@@ -1,5 +1,6 @@
 const std = @import("std");
 
+const escape = @import("./escape.zig");
 const Lexer = @import("./Lexer.zig");
 
 const Self = @This();
@@ -85,7 +86,11 @@ fn consumePlaceholder(lexer: *Lexer) !?Placeholder {
     };
 }
 
-fn evaluateContents(writer: anytype, lexer: *Lexer, variables: ?*std.StringHashMap([]const u8)) !void {
+fn evaluateContents(
+    writer: anytype,
+    lexer: *Lexer,
+    variables: ?*std.StringHashMap([]const u8),
+) !void {
     var contents = lexer.consumeUntilAny("<{");
     try writer.print("{s}", .{ contents });
 
@@ -96,7 +101,7 @@ fn evaluateContents(writer: anytype, lexer: *Lexer, variables: ?*std.StringHashM
         }
 
         if (variables.?.get(placeholder.name)) |value| {
-            try writer.print("{s}", .{ value });
+            try escape.writeEscaped(writer, value, .html_body);
         } else {
             return error.UnresolvedPlaceholder;
         }
@@ -276,4 +281,19 @@ test "error if no placeholders provided" {
     var actual = evaluate(allocator, input, null);
 
     try std.testing.expectError(error.UnresolvedPlaceholder, actual);
+}
+
+test "escape in html body" {
+    var allocator = std.testing.allocator;
+    var input = "<foo>{hello}!</foo>";
+
+    var variables = std.StringHashMap([]const u8).init(allocator);
+    defer variables.deinit();
+
+    try variables.put("hello", "<script>alert(1)</script> &");
+
+    var actual = try evaluate(allocator, input, &variables);
+    defer allocator.free(actual);
+
+    try std.testing.expectEqualStrings("<foo>&lt;script&gt;alert(1)&lt;/script&gt; &amp;!</foo>", actual);
 }
