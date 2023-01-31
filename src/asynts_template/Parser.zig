@@ -67,13 +67,13 @@ fn evaluateTag(writer: anytype, lexer: *Lexer) !bool {
 
         try writer.print("</{s}>", .{ close_tag_name });
 
-        var contents_2 = lexer.consumeUntil('<');
-        try writer.print("{s}", .{ contents_2 });
-
         return true;
     }
 
-    while (try evaluateTag(writer, lexer)) { }
+    while (try evaluateTag(writer, lexer)) {
+        var contents_2 = lexer.consumeUntil('<');
+        try writer.print("{s}", .{ contents_2});
+    }
 
     if (consumeCloseTag(lexer)) |close_tag_name| {
         if (!std.mem.eql(u8, open_tag_name, close_tag_name)) {
@@ -81,9 +81,6 @@ fn evaluateTag(writer: anytype, lexer: *Lexer) !bool {
         }
 
         try writer.print("</{s}>", .{ close_tag_name });
-
-        var contents_2 = lexer.consumeUntil('<');
-        try writer.print("{s}", .{ contents_2 });
 
         return true;
     }
@@ -101,9 +98,16 @@ fn evaluate(allocator: std.mem.Allocator, input: []const u8) ![]const u8 {
 
     _ = lexer.consumeWhitespace();
 
-    if (!try evaluateTag(writer, &lexer)) {
+    if (lexer.isEnd()) {
         return error.NoTagFound;
     }
+
+    if (lexer.peek() != '<') {
+        return error.CharactersOutsideOfTag;
+    }
+
+    var tag_found = try evaluateTag(writer, &lexer);
+    std.debug.assert(tag_found);
 
     _ = lexer.consumeWhitespace();
 
@@ -150,34 +154,34 @@ test "forbid characters before tag" {
 
     var actual = evaluate(allocator, input);
 
-    try std.testing.expectError(error.NoTagFound, actual);
+    try std.testing.expectError(error.CharactersOutsideOfTag, actual);
 }
 
-// test "forbid characters after tag" {
-//     var allocator = std.testing.allocator;
-//     var input = "<foo></foo>x";
-
-//     var actual = evaluate(allocator, input);
-
-//     try std.testing.expectError(error.NoTagFound, actual);
-// }
-
-// test "discard surrounding whitespace" {
-//     var allocator = std.testing.allocator;
-//     var input = " <foo></foo> ";
-
-//     var actual = try evaluate(allocator, input);
-//     defer allocator.free(actual);
-
-//     try std.testing.expectEqualStrings("<foo></foo>", actual);
-// }
-
-test "preserve whitespace in tags" {
+test "forbid characters after tag" {
     var allocator = std.testing.allocator;
-    var input = "<foo> </foo>";
+    var input = "<foo></foo>x";
+
+    var actual = evaluate(allocator, input);
+
+    try std.testing.expectError(error.CharactersOutsideOfTag, actual);
+}
+
+test "discard surrounding whitespace" {
+    var allocator = std.testing.allocator;
+    var input = " <foo></foo> ";
 
     var actual = try evaluate(allocator, input);
     defer allocator.free(actual);
 
-    try std.testing.expectEqualStrings("<foo> </foo>", actual);
+    try std.testing.expectEqualStrings("<foo></foo>", actual);
+}
+
+test "preserve whitespace in tags" {
+    var allocator = std.testing.allocator;
+    var input = "<foo> <bar>  </bar> x </foo> ";
+
+    var actual = try evaluate(allocator, input);
+    defer allocator.free(actual);
+
+    try std.testing.expectEqualStrings("<foo> <bar>  </bar> x </foo>", actual);
 }
