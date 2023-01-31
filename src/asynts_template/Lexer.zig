@@ -43,3 +43,16 @@ pub fn consumeChar(self: *Self, char: u8) bool {
 
     return false;
 }
+
+pub fn consumeString(self: *Self, string: []const u8) bool {
+    var start_offset = self.offset;
+
+    for (string) |char| {
+        if (!self.consumeChar(char)) {
+            self.offset = start_offset;
+            return false;
+        }
+    }
+
+    return true;
+}

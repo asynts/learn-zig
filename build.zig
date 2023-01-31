@@ -25,6 +25,11 @@ pub fn build(b: *std.build.Builder) void {
     tests_1.setTarget(target);
     tests_1.setBuildMode(mode);
 
+    var tests_2 = b.addTest("src/asynts_template/Parser.zig");
+    tests_2.setTarget(target);
+    tests_2.setBuildMode(mode);
+
     var test_step = b.step("test", "Run library tests");
     test_step.dependOn(&tests_1.step);
+    test_step.dependOn(&tests_2.step);
 }
