@@ -99,14 +99,22 @@ fn evaluate(allocator: std.mem.Allocator, input: []const u8) ![]const u8 {
 
     var writer = buffer.writer();
 
+    _ = lexer.consumeWhitespace();
+
     if (!try evaluateTag(writer, &lexer)) {
         return error.NoTagFound;
+    }
+
+    _ = lexer.consumeWhitespace();
+
+    if (!lexer.isEnd()) {
+        return error.CharactersOutsideOfTag;
     }
 
     return buffer.toOwnedSlice();
 }
 
-test {
+test "simple tag working" {
     var allocator = std.testing.allocator;
     var input = "<foo>x</foo>";
 
@@ -116,7 +124,7 @@ test {
     try std.testing.expectEqualStrings("<foo>x</foo>", actual);
 }
 
-test {
+test "nested tags accepted" {
     var allocator = std.testing.allocator;
     var input = "<foo><bar></bar></foo>";
 
@@ -126,7 +134,7 @@ test {
     try std.testing.expectEqualStrings("<foo><bar></bar></foo>", actual);
 }
 
-test {
+test "inline text included in output" {
     var allocator = std.testing.allocator;
     var input = "<foo>x<bar>y</bar>z</foo>";
 
@@ -134,4 +142,42 @@ test {
     defer allocator.free(actual);
 
     try std.testing.expectEqualStrings("<foo>x<bar>y</bar>z</foo>", actual);
+}
+
+test "forbid characters before tag" {
+    var allocator = std.testing.allocator;
+    var input = "x<foo></foo>";
+
+    var actual = evaluate(allocator, input);
+
+    try std.testing.expectError(error.NoTagFound, actual);
+}
+
+// test "forbid characters after tag" {
+//     var allocator = std.testing.allocator;
+//     var input = "<foo></foo>x";
+
+//     var actual = evaluate(allocator, input);
+
+//     try std.testing.expectError(error.NoTagFound, actual);
+// }
+
+// test "discard surrounding whitespace" {
+//     var allocator = std.testing.allocator;
+//     var input = " <foo></foo> ";
+
+//     var actual = try evaluate(allocator, input);
+//     defer allocator.free(actual);
+
+//     try std.testing.expectEqualStrings("<foo></foo>", actual);
+// }
+
+test "preserve whitespace in tags" {
+    var allocator = std.testing.allocator;
+    var input = "<foo> </foo>";
+
+    var actual = try evaluate(allocator, input);
+    defer allocator.free(actual);
+
+    try std.testing.expectEqualStrings("<foo> </foo>", actual);
 }

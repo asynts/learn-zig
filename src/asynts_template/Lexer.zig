@@ -56,3 +56,22 @@ pub fn consumeString(self: *Self, string: []const u8) bool {
 
     return true;
 }
+
+
+pub fn consumeWhitespace(self: *Self) []const u8 {
+    var start_offset = self.offset;
+
+    while (true) {
+        if (self.consumeChar(' ')) {
+            continue;
+        }
+        if (self.consumeChar('\t')) {
+            continue;
+        }
+        if (self.consumeChar('\n')) {
+            continue;
+        }
+
+        return self.input[start_offset..self.offset];
+    }
+}
