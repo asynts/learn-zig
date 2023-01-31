@@ -23,8 +23,26 @@
     zig build-exe ./foo.zig
     ```
 
-### Tasks
+-   This snippet also reproduces the crash:
+    ```zig
+    const std = @import("std");
 
--   Look if this issue can be reproduced in the trunk compiler.
+    const Braces2 = struct {
+        lhs: u8,
+    };
 
--   Look if there is already an open issue about this.
+    inline fn foo() Braces2 {
+        return if (true) .{ .lhs = '<' } else .{ .lhs = '[' };
+    }
+
+    pub fn main() void {
+        var braces = foo();
+        std.debug.print("{}\n", .{ braces.lhs });
+    }
+    ```
+
+-   This bug seems to be resolved in `trunk`.
+
+-   I was not able to find a matching issue.
+
+-   I could bisect this but I am too lazy.
