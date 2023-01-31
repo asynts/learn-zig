@@ -51,32 +51,39 @@ fn consumeCloseTag(lexer: *Lexer) ?[]const u8 {
 // FIXME: Does zig have generators?
 //        Maybe they could be used with 'inline for'?
 
-/// Assumes that the input is well-formed.
-/// We avoid memory allocations by using recursion, effectively allocating on the stack.
-fn evaluate(lexer: *Lexer) !bool {
+fn evaluateTag(writer: anytype, lexer: *Lexer) !bool {
     var open_tag_name = consumeOpenTag(lexer)
         orelse return false;
 
-    var contents = lexer.consumeUntil('<');
-    _ = contents;
+    try writer.print("<{s}>", .{ open_tag_name });
+
+    var contents_1 = lexer.consumeUntil('<');
+    try writer.print("{s}", .{ contents_1});
 
     if (consumeCloseTag(lexer)) |close_tag_name| {
         if (!std.mem.eql(u8, open_tag_name, close_tag_name)) {
             return error.UnexpectedCloseTag;
         }
+
+        try writer.print("</{s}>", .{ close_tag_name });
+
+        var contents_2 = lexer.consumeUntil('<');
+        try writer.print("{s}", .{ contents_2 });
 
         return true;
     }
 
-    while (try evaluate(lexer)) {
-        var contents2 = lexer.consumeUntil('<');
-        _ = contents2;
-    }
+    while (try evaluateTag(writer, lexer)) { }
 
     if (consumeCloseTag(lexer)) |close_tag_name| {
         if (!std.mem.eql(u8, open_tag_name, close_tag_name)) {
             return error.UnexpectedCloseTag;
         }
+
+        try writer.print("</{s}>", .{ close_tag_name });
+
+        var contents_2 = lexer.consumeUntil('<');
+        try writer.print("{s}", .{ contents_2 });
 
         return true;
     }
@@ -84,29 +91,47 @@ fn evaluate(lexer: *Lexer) !bool {
     return error.TagNotClosed;
 }
 
+fn evaluate(allocator: std.mem.Allocator, input: []const u8) ![]const u8 {
+    var lexer = Lexer.init(input);
+
+    var buffer = std.ArrayList(u8).init(allocator);
+    defer buffer.deinit();
+
+    var writer = buffer.writer();
+
+    if (!try evaluateTag(writer, &lexer)) {
+        return error.NoTagFound;
+    }
+
+    return buffer.toOwnedSlice();
+}
+
 test {
+    var allocator = std.testing.allocator;
     var input = "<foo>x</foo>";
-    var lexer = Lexer.init(input);
 
-    var actual = try evaluate(&lexer);
+    var actual = try evaluate(allocator, input);
+    defer allocator.free(actual);
 
-    try std.testing.expect(actual);
+    try std.testing.expectEqualStrings("<foo>x</foo>", actual);
 }
 
 test {
+    var allocator = std.testing.allocator;
     var input = "<foo><bar></bar></foo>";
-    var lexer = Lexer.init(input);
 
-    var actual = try evaluate(&lexer);
+    var actual = try evaluate(allocator, input);
+    defer allocator.free(actual);
 
-    try std.testing.expect(actual);
+    try std.testing.expectEqualStrings("<foo><bar></bar></foo>", actual);
 }
 
 test {
+    var allocator = std.testing.allocator;
     var input = "<foo>x<bar>y</bar>z</foo>";
-    var lexer = Lexer.init(input);
 
-    var actual = try evaluate(&lexer);
+    var actual = try evaluate(allocator, input);
+    defer allocator.free(actual);
 
-    try std.testing.expect(actual);
+    try std.testing.expectEqualStrings("<foo>x<bar>y</bar>z</foo>", actual);
 }
