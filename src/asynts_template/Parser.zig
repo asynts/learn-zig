@@ -12,7 +12,7 @@ const Self = @This();
 // FIXME: Does zig have generators?
 //        Maybe they could be used with 'inline for'?
 
-fn consumeOpenTag(lexer: *Lexer) !?[]const u8 {
+fn consumeOpenTagStart(lexer: *Lexer) !?[]const u8 {
     var start_offset = lexer.offset;
 
     if (!lexer.consumeChar('<')) {
@@ -25,14 +25,9 @@ fn consumeOpenTag(lexer: *Lexer) !?[]const u8 {
         return null;
     }
 
-    var tag_name = lexer.consumeUntil('>');
+    var tag_name = lexer.consumeUntilAny(" \t\n>");
 
     // FIXME: Verify that the tag name is valid.
-
-    if (!lexer.consumeChar('>')) {
-        lexer.offset = start_offset;
-        return error.InvalidTag;
-    }
 
     return tag_name;
 }
@@ -111,11 +106,63 @@ fn evaluateContents(
     }
 }
 
-fn evaluateTag(writer: anytype, lexer: *Lexer, variables: ?*std.StringHashMap([]const u8)) !bool {
-    var open_tag_name = try consumeOpenTag(lexer)
-        orelse return false;
+fn evaluateAttribute(
+    writer: anytype,
+    lexer: *Lexer,
+    variables: ?*std.StringHashMap([]const u8)
+) !bool {
+    _ = variables;
 
-    try writer.print("<{s}>", .{ open_tag_name });
+    var attribute_name = lexer.consumeUntilAny("=> \t\n");
+    try writer.print("{s}", .{ attribute_name });
+
+    // FIXME: Validate attribute name.
+
+    if (lexer.consumeChar('=')) {
+        // FIXME: Consume attribute value.
+        //        Remember to print '='.
+    }
+
+    // FIXME: Remember to leave trailing whitespace intact.
+
+    return false;
+}
+
+fn evaluateOpenTag(
+    writer: anytype,
+    lexer: *Lexer,
+    variables: ?*std.StringHashMap([]const u8)
+) !?[]const u8 {
+    var open_tag_name = try consumeOpenTagStart(lexer)
+        orelse return null;
+
+    try writer.print("<{s}", .{ open_tag_name });
+
+    _ = lexer.consumeWhitespace();
+
+    while (try evaluateAttribute(writer, lexer, variables)) {
+        if (lexer.consumeWhitespace().len == 0) {
+            break;
+        }
+    }
+
+    _ = lexer.consumeWhitespace();
+
+    if (!lexer.consumeChar('>')) {
+        return error.InvalidTag;
+    }
+    try writer.print(">", .{});
+
+    return open_tag_name;
+}
+
+fn evaluateTag(
+    writer: anytype,
+    lexer: *Lexer,
+    variables: ?*std.StringHashMap([]const u8),
+) !bool {
+    var open_tag_name = try evaluateOpenTag(writer, lexer, variables)
+        orelse return false;
 
     try evaluateContents(writer, lexer, variables);
 
@@ -146,7 +193,11 @@ fn evaluateTag(writer: anytype, lexer: *Lexer, variables: ?*std.StringHashMap([]
     return error.TagNotClosed;
 }
 
-pub fn evaluate(allocator: std.mem.Allocator, input: []const u8, variables: ?*std.StringHashMap([]const u8)) ![]const u8 {
+pub fn evaluate(
+    allocator: std.mem.Allocator,
+    input: []const u8,
+    variables: ?*std.StringHashMap([]const u8)
+) ![]const u8 {
     var lexer = Lexer.init(input);
 
     var buffer = std.ArrayList(u8).init(allocator);
