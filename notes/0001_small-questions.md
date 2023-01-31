@@ -42,6 +42,23 @@
 -   What does `union(enum)` do?
     Does this allow me to drop the redundant enums?
 
+-   How to register the tests in multiple or all files.
+    Currently, I need to do something like this:
+
+    ```zig
+    var tests_1 = b.addTest("src/asynts_template/lib.zig");
+    tests_1.setTarget(target);
+    tests_1.setBuildMode(mode);
+
+    var tests_2 = b.addTest("src/asynts_template/Parser.zig");
+    tests_2.setTarget(target);
+    tests_2.setBuildMode(mode);
+
+    var test_step = b.step("test", "Run library tests");
+    test_step.dependOn(&tests_1.step);
+    test_step.dependOn(&tests_2.step);
+    ```
+
 ### Closed
 
 -   Question: What are the general naming conventions for `snake_case` and `camelCase`?

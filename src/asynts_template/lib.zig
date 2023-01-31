@@ -1,6 +1,5 @@
 const std = @import("std");
 
-const Parser = @import("./Parser.zig");
 const Lexer = @import("./Lexer.zig");
 
 pub const Generator = struct {
@@ -17,8 +16,6 @@ pub const Generator = struct {
         _ = self;
     }
 
-    // FIXME: I think a better approach would be to prepare a sequence of instructions at comptime that is executed at runtime.
-    //        With 'Literal' and 'VariableSubstitution' or something like that.
     pub fn run(self: *const Self, arguments: anytype, comptime inputTemplate: []const u8) ![]const u8 {
         comptime var lexer = Lexer.init(inputTemplate);
 

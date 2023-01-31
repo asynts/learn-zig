@@ -11,3 +11,9 @@
 -   Bug: The help page is missing a final newline.
 
 -   Bug: The `Help.getBraces` function crashes the compiler as of `0.10.1`.
+
+### asynts-template
+
+-   Unit test `Lexer`.
+
+-   Parse some HTML / XML syntax at compile time.
