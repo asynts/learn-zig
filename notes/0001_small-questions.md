@@ -59,6 +59,11 @@
     test_step.dependOn(&tests_2.step);
     ```
 
+-   When is `pub` applicable, in a compilation unit?
+
+-   How does Zig handle compilation units in general, what can be compiled in parallel.
+    Does `build.zig` use parallelism?
+
 ### Closed
 
 -   Question: What are the general naming conventions for `snake_case` and `camelCase`?

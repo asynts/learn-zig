@@ -202,3 +202,9 @@
         return false;
     }
     ```
+
+-   I should note, that my interpreted version probably doesn't have any meaningful advantages.
+    In order for this to become useful, I would have to call the `format` functions from the implementation and do a large switch case
+    on the types of the parameters.
+
+    Then the function could be marked as never inline and then I can inline everything else into it.
