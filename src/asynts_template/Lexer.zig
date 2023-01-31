@@ -18,17 +18,24 @@ pub fn peek(self: *const Self) u8 {
     return self.input[self.offset];
 }
 
-pub fn consumeUntil(self: *Self, marker: u8) []const u8 {
+pub fn consumeUntilAny(self: *Self, comptime chars: []const u8) []const u8 {
     var start_offset = self.offset;
 
     while (!self.isEnd()) {
-        if (self.peek() == marker) {
-            return self.input[start_offset..self.offset];
+        inline for (chars) |char| {
+            if (self.peek() == char) {
+                return self.input[start_offset..self.offset];
+            }
         }
+
         self.offset += 1;
     }
 
     return self.input[start_offset..];
+}
+
+pub fn consumeUntil(self: *Self, comptime char: u8) []const u8 {
+    return self.consumeUntilAny(&[_]u8 { char });
 }
 
 pub fn consumeChar(self: *Self, char: u8) bool {
