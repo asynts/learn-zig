@@ -15,6 +15,11 @@ fn consumeOpenTag(lexer: *Lexer) ?[]const u8 {
         return null;
     }
 
+    if (lexer.consumeChar('/')) {
+        lexer.offset = start_offset;
+        return null;
+    }
+
     var tag_name = lexer.consumeUntil('>');
 
     if (!lexer.consumeChar('>')) {
@@ -63,7 +68,10 @@ fn evaluate(lexer: *Lexer) !bool {
         return true;
     }
 
-    while (try evaluate(lexer)) { }
+    while (try evaluate(lexer)) {
+        var contents2 = lexer.consumeUntil('<');
+        _ = contents2;
+    }
 
     if (consumeCloseTag(lexer)) |close_tag_name| {
         if (!std.mem.eql(u8, open_tag_name, close_tag_name)) {
@@ -78,6 +86,24 @@ fn evaluate(lexer: *Lexer) !bool {
 
 test {
     var input = "<foo>x</foo>";
+    var lexer = Lexer.init(input);
+
+    var actual = try evaluate(&lexer);
+
+    try std.testing.expect(actual);
+}
+
+test {
+    var input = "<foo><bar></bar></foo>";
+    var lexer = Lexer.init(input);
+
+    var actual = try evaluate(&lexer);
+
+    try std.testing.expect(actual);
+}
+
+test {
+    var input = "<foo>x<bar>y</bar>z</foo>";
     var lexer = Lexer.init(input);
 
     var actual = try evaluate(&lexer);
