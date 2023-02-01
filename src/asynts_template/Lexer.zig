@@ -1,4 +1,5 @@
 const escape = @import("./escape.zig");
+const common = @import("./common.zig");
 
 const Self = @This();
 
@@ -103,8 +104,7 @@ pub fn consumeOpenTagStart(self: *Self) !?[]const u8 {
     }
 
     var tag_name = self.consumeUntilAny(" \t\n>");
-
-    // FIXME: Verify that the tag name is valid.
+    try common.validateName(tag_name, .tag_name);
 
     return tag_name;
 }
@@ -118,8 +118,7 @@ pub fn consumeCloseTag(self: *Self) !?[]const u8 {
     }
 
     var tag_name = self.consumeUntil('>');
-
-    // FIXME: Verify that the tag name is valid.
+    try common.validateName(tag_name, .tag_name);
 
     if (!self.consumeChar('>')) {
         self.offset = start_offset;

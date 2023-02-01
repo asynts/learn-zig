@@ -208,3 +208,5 @@
     on the types of the parameters.
 
     Then the function could be marked as never inline and then I can inline everything else into it.
+
+-   I think that `meta.fieldIndex` resolves this issue.

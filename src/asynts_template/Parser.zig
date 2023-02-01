@@ -1,6 +1,7 @@
 const std = @import("std");
 
 const escape = @import("./escape.zig");
+const common = @import("./common.zig");
 const Lexer = @import("./Lexer.zig");
 
 const Self = @This();
@@ -54,10 +55,10 @@ fn evaluateAttribute(
         return false;
     }
 
+    try common.validateName(attribute_name, .attribute_name);
+
     // Include space that was consumed by caller of this function.
     try writer.print(" {s}", .{ attribute_name });
-
-    // FIXME: Validate attribute name.
 
     // Attribute value is optional.
     if (lexer.consumeChar('=')) {
@@ -209,6 +210,15 @@ test "inline text included in output" {
     defer allocator.free(actual);
 
     try std.testing.expectEqualStrings("<foo>x<bar>y</bar>z</foo>", actual);
+}
+
+test "forbid incorrect close tag" {
+    var allocator = std.testing.allocator;
+    var input = "<foo></bar>";
+
+    var actual = evaluate(allocator, input, null);
+
+    try std.testing.expectError(error.UnexpectedCloseTag, actual);
 }
 
 test "forbid characters before tag" {
@@ -376,4 +386,26 @@ test "trivial attribute with placeholder" {
     try std.testing.expectEqualStrings(
         \\<foo example="quote='&quot;' &amp; script='<script>alert(1)</script>'"></foo>
         , actual);
+}
+
+test "forbid invalid tag name" {
+    var allocator = std.testing.allocator;
+
+    try std.testing.expectError(error.InvalidName, evaluate(allocator, "<foo-></foo->", null));
+    try std.testing.expectError(error.InvalidName, evaluate(allocator, "<-foo></-foo>", null));
+    try std.testing.expectError(error.UppercaseCharacterInName, evaluate(allocator, "<scripT></scripT>", null));
+    try std.testing.expectError(error.InvalidName, evaluate(allocator, "<foo--bar></foo--bar>", null));
+}
+
+test "forbid invalid attribute name" {
+    var allocator = std.testing.allocator;
+
+    try std.testing.expectError(error.InvalidName, evaluate(allocator,
+        \\<foo x="42" y-="1"></foo>
+        , null
+    ));
+    try std.testing.expectError(error.UppercaseCharacterInName, evaluate(allocator,
+        \\<foo Z="hello"></foo>
+        , null
+    ));
 }

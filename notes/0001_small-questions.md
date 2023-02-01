@@ -59,10 +59,15 @@
     test_step.dependOn(&tests_2.step);
     ```
 
+    -   It seems to automatically grab tests in all other included files.
+        However, this seems to be a bit inconsistent, I should verify this.
+
 -   When is `pub` applicable, in a compilation unit?
 
 -   How does Zig handle compilation units in general, what can be compiled in parallel.
     Does `build.zig` use parallelism?
+
+-   How to test if something is an error without checking for explicit error?
 
 ### Closed
 
