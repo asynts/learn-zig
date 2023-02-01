@@ -28,7 +28,7 @@ fn writeEscapedIntoAttributeValue(writer: anytype, input: []const u8) !void {
     }
 }
 
-const EscapeContext = enum {
+pub const EscapeContext = enum {
     html_body,
     attribute_value,
 };

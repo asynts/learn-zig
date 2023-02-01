@@ -85,13 +85,22 @@ fn consumePlaceholder(lexer: *Lexer) !?Placeholder {
     };
 }
 
+fn consumeRawContent(lexer: *Lexer, context: escape.EscapeContext) []const u8 {
+    switch (context) {
+        .html_body => return lexer.consumeUntilAny("<{"),
+        .attribute_value => return lexer.consumeUntilAny("\"{"),
+    }
+}
+
+// FIXME: Add support for '&escape;'.
 fn evaluateContents(
     writer: anytype,
     lexer: *Lexer,
     variables: ?*std.StringHashMap([]const u8),
+    context: escape.EscapeContext,
 ) !void {
-    var contents = lexer.consumeUntilAny("<{");
-    try writer.print("{s}", .{ contents });
+    var contents_1 = consumeRawContent(lexer, context);
+    try writer.print("{s}", .{ contents_1 });
 
     while (try consumePlaceholder(lexer)) |placeholder|
     {
@@ -100,12 +109,12 @@ fn evaluateContents(
         }
 
         if (variables.?.get(placeholder.name)) |value| {
-            try escape.writeEscaped(writer, value, .html_body);
+            try escape.writeEscaped(writer, value, context);
         } else {
             return error.UnresolvedPlaceholder;
         }
 
-        var contents_2 = lexer.consumeUntilAny("<{");
+        var contents_2 = consumeRawContent(lexer, context);
         try writer.print("{s}", .{ contents_2 });
     }
 }
@@ -115,8 +124,6 @@ fn evaluateAttribute(
     lexer: *Lexer,
     variables: ?*std.StringHashMap([]const u8)
 ) !bool {
-    _ = variables;
-
     var attribute_name = lexer.consumeUntilAny("=> \t\n");
 
     if (attribute_name.len == 0) {
@@ -133,16 +140,14 @@ fn evaluateAttribute(
         if (!lexer.consumeChar('"')) {
             return error.InvalidAttribute;
         }
+        try writer.print("=\"", .{});
 
-        // FIXME: Add support for '&escape;'.
-        // FIXME: Add support for '{placeholder}'
-        var attribute_value = lexer.consumeUntil('"');
+        try evaluateContents(writer, lexer, variables, .attribute_value);
 
         if (!lexer.consumeChar('"')) {
             return error.InvalidAttribute;
         }
-
-        try writer.print("=\"{s}\"", .{ attribute_value });
+        try writer.print("\"", .{});
     }
 
     return true;
@@ -169,6 +174,7 @@ fn evaluateOpenTag(
     _ = lexer.consumeWhitespace();
 
     if (!lexer.consumeChar('>')) {
+        std.debug.print("evaluateOpenTag: remaining='{s}'\n", .{lexer.remaining()});
         return error.InvalidTag;
     }
     try writer.print(">", .{});
@@ -184,7 +190,7 @@ fn evaluateTag(
     var open_tag_name = try evaluateOpenTag(writer, lexer, variables)
         orelse return false;
 
-    try evaluateContents(writer, lexer, variables);
+    try evaluateContents(writer, lexer, variables, .html_body);
 
     if (try consumeCloseTag(lexer)) |close_tag_name| {
         if (!std.mem.eql(u8, open_tag_name, close_tag_name)) {
@@ -197,7 +203,7 @@ fn evaluateTag(
     }
 
     while (try evaluateTag(writer, lexer, variables)) {
-        try evaluateContents(writer, lexer, variables);
+        try evaluateContents(writer, lexer, variables, .html_body);
     }
 
     if (try consumeCloseTag(lexer)) |close_tag_name| {
@@ -373,6 +379,20 @@ test "escape in html body" {
     try std.testing.expectEqualStrings("<foo>&lt;script&gt;alert(1)&lt;/script&gt; &amp;!</foo>", actual);
 }
 
+test "trivial attribute" {
+    var allocator = std.testing.allocator;
+    var input =
+        \\<foo x="42"></foo>
+        ;
+
+    var actual = try evaluate(allocator, input, null);
+    defer allocator.free(actual);
+
+    try std.testing.expectEqualStrings(
+        \\<foo x="42"></foo>
+        , actual);
+}
+
 test "basic attribute support" {
     var allocator = std.testing.allocator;
     var input =
@@ -412,5 +432,24 @@ test "attributes without values" {
 
     try std.testing.expectEqualStrings(
         \\<foo x y="42" z></foo>
+        , actual);
+}
+
+test "trivial attribute with placeholder" {
+    var allocator = std.testing.allocator;
+    var input =
+        \\<foo example="{example}"></foo>
+        ;
+
+    var variables = std.StringHashMap([]const u8).init(allocator);
+    defer variables.deinit();
+
+    try variables.put("example", "quote='\"' & script='<script>alert(1)</script>'");
+
+    var actual = try evaluate(allocator, input, &variables);
+    defer allocator.free(actual);
+
+    try std.testing.expectEqualStrings(
+        \\<foo example="quote='&quot;' &amp; script='<script>alert(1)</script>'"></foo>
         , actual);
 }
