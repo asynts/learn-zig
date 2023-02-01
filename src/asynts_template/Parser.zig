@@ -12,6 +12,10 @@ const Self = @This();
 // FIXME: Does zig have generators?
 //        Maybe they could be used with 'inline for'?
 
+// FIXME: I should extract the grammar from this and ensure that it makes sense.
+
+// FIXME: Add support for immediately closed tags with '<foo />'.
+
 fn consumeOpenTagStart(lexer: *Lexer) !?[]const u8 {
     var start_offset = lexer.offset;
 
@@ -114,18 +118,34 @@ fn evaluateAttribute(
     _ = variables;
 
     var attribute_name = lexer.consumeUntilAny("=> \t\n");
-    try writer.print("{s}", .{ attribute_name });
+
+    if (attribute_name.len == 0) {
+        return false;
+    }
+
+    // Include space that was consumed by caller of this function.
+    try writer.print(" {s}", .{ attribute_name });
 
     // FIXME: Validate attribute name.
 
+    // Attribute value is optional.
     if (lexer.consumeChar('=')) {
-        // FIXME: Consume attribute value.
-        //        Remember to print '='.
+        if (!lexer.consumeChar('"')) {
+            return error.InvalidAttribute;
+        }
+
+        // FIXME: Add support for '&escape;'.
+        // FIXME: Add support for '{placeholder}'
+        var attribute_value = lexer.consumeUntil('"');
+
+        if (!lexer.consumeChar('"')) {
+            return error.InvalidAttribute;
+        }
+
+        try writer.print("=\"{s}\"", .{ attribute_value });
     }
 
-    // FIXME: Remember to leave trailing whitespace intact.
-
-    return false;
+    return true;
 }
 
 fn evaluateOpenTag(
@@ -218,7 +238,11 @@ pub fn evaluate(
     var tag_found = try evaluateTag(writer, &lexer, variables);
     std.debug.assert(tag_found);
 
-    _ = lexer.consumeWhitespace();
+    // Remove trailing whitespace but keep final newline if the input included it.
+    var trailing_whitespace = lexer.consumeWhitespace();
+    if (std.mem.indexOf(u8, trailing_whitespace, "\n") != null) {
+        try writer.print("\n", .{});
+    }
 
     if (!lexer.isEnd()) {
         return error.CharactersOutsideOfTag;
@@ -347,4 +371,32 @@ test "escape in html body" {
     defer allocator.free(actual);
 
     try std.testing.expectEqualStrings("<foo>&lt;script&gt;alert(1)&lt;/script&gt; &amp;!</foo>", actual);
+}
+
+test "basic attribute support" {
+    var allocator = std.testing.allocator;
+    var input =
+        \\<foo y="13"  z="1">
+        \\  <bar x="42"></bar>
+        \\</foo>
+        ;
+
+    var actual = try evaluate(allocator, input, null);
+    defer allocator.free(actual);
+
+    try std.testing.expectEqualStrings(
+        \\<foo y="13" z="1">
+        \\  <bar x="42"></bar>
+        \\</foo>
+        , actual);
+}
+
+test "persist final newline" {
+    var allocator = std.testing.allocator;
+    var input = "<foo></foo> \n ";
+
+    var actual = try evaluate(allocator, input, null);
+    defer allocator.free(actual);
+
+    try std.testing.expectEqualStrings("<foo></foo>\n", actual);
 }

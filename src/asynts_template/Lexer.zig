@@ -18,6 +18,10 @@ pub fn peek(self: *const Self) u8 {
     return self.input[self.offset];
 }
 
+pub fn remaining(self: *const Self) []const u8 {
+    return self.input[self.offset..];
+}
+
 pub fn consumeUntilAny(self: *Self, comptime chars: []const u8) []const u8 {
     var start_offset = self.offset;
 
