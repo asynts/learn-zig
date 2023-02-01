@@ -400,3 +400,17 @@ test "persist final newline" {
 
     try std.testing.expectEqualStrings("<foo></foo>\n", actual);
 }
+
+test "attributes without values" {
+    var allocator = std.testing.allocator;
+    var input =
+        \\<foo x y="42" z></foo>
+        ;
+
+    var actual = try evaluate(allocator, input, null);
+    defer allocator.free(actual);
+
+    try std.testing.expectEqualStrings(
+        \\<foo x y="42" z></foo>
+        , actual);
+}
