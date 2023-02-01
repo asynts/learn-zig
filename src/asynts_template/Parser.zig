@@ -16,82 +16,6 @@ const Self = @This();
 
 // FIXME: Add support for immediately closed tags with '<foo />'.
 
-fn consumeOpenTagStart(lexer: *Lexer) !?[]const u8 {
-    var start_offset = lexer.offset;
-
-    if (!lexer.consumeChar('<')) {
-        lexer.offset = start_offset;
-        return null;
-    }
-
-    if (lexer.consumeChar('/')) {
-        lexer.offset = start_offset;
-        return null;
-    }
-
-    var tag_name = lexer.consumeUntilAny(" \t\n>");
-
-    // FIXME: Verify that the tag name is valid.
-
-    return tag_name;
-}
-
-fn consumeCloseTag(lexer: *Lexer) !?[]const u8 {
-    var start_offset = lexer.offset;
-
-    if (!lexer.consumeString("</")) {
-        lexer.offset = start_offset;
-        return null;
-    }
-
-    var tag_name = lexer.consumeUntil('>');
-
-    // FIXME: Verify that the tag name is valid.
-
-    if (!lexer.consumeChar('>')) {
-        lexer.offset = start_offset;
-        return error.InvalidTag;
-    }
-
-    return tag_name;
-}
-
-const Placeholder = struct {
-    name: []const u8,
-};
-fn consumePlaceholder(lexer: *Lexer) !?Placeholder {
-    var start_offset = lexer.offset;
-
-    if (!lexer.consumeChar('{')) {
-        lexer.offset = start_offset;
-        return null;
-    }
-
-    if (lexer.consumeChar('{')) {
-        @panic("caller should consume escaped braces");
-    }
-
-    var placeholder_name = lexer.consumeUntil('}');
-
-    // FIXME: Verify that the placeholder name is valid.
-
-    if (!lexer.consumeChar('}')) {
-        lexer.offset = start_offset;
-        return error.InvalidPlaceholder;
-    }
-
-    return .{
-        .name = placeholder_name,
-    };
-}
-
-fn consumeRawContent(lexer: *Lexer, context: escape.EscapeContext) []const u8 {
-    switch (context) {
-        .html_body => return lexer.consumeUntilAny("<{"),
-        .attribute_value => return lexer.consumeUntilAny("\"{"),
-    }
-}
-
 // FIXME: Add support for '&escape;'.
 fn evaluateContents(
     writer: anytype,
@@ -99,22 +23,22 @@ fn evaluateContents(
     variables: ?*std.StringHashMap([]const u8),
     context: escape.EscapeContext,
 ) !void {
-    var contents_1 = consumeRawContent(lexer, context);
+    var contents_1 = lexer.consumeRawContent(context);
     try writer.print("{s}", .{ contents_1 });
 
-    while (try consumePlaceholder(lexer)) |placeholder|
+    while (try lexer.consumePlaceholder()) |placeholder_name|
     {
         if (variables == null) {
             return error.UnresolvedPlaceholder;
         }
 
-        if (variables.?.get(placeholder.name)) |value| {
+        if (variables.?.get(placeholder_name)) |value| {
             try escape.writeEscaped(writer, value, context);
         } else {
             return error.UnresolvedPlaceholder;
         }
 
-        var contents_2 = consumeRawContent(lexer, context);
+        var contents_2 = lexer.consumeRawContent(context);
         try writer.print("{s}", .{ contents_2 });
     }
 }
@@ -158,7 +82,7 @@ fn evaluateOpenTag(
     lexer: *Lexer,
     variables: ?*std.StringHashMap([]const u8)
 ) !?[]const u8 {
-    var open_tag_name = try consumeOpenTagStart(lexer)
+    var open_tag_name = try lexer.consumeOpenTagStart()
         orelse return null;
 
     try writer.print("<{s}", .{ open_tag_name });
@@ -192,7 +116,7 @@ fn evaluateTag(
 
     try evaluateContents(writer, lexer, variables, .html_body);
 
-    if (try consumeCloseTag(lexer)) |close_tag_name| {
+    if (try lexer.consumeCloseTag()) |close_tag_name| {
         if (!std.mem.eql(u8, open_tag_name, close_tag_name)) {
             return error.UnexpectedCloseTag;
         }
@@ -206,7 +130,7 @@ fn evaluateTag(
         try evaluateContents(writer, lexer, variables, .html_body);
     }
 
-    if (try consumeCloseTag(lexer)) |close_tag_name| {
+    if (try lexer.consumeCloseTag()) |close_tag_name| {
         if (!std.mem.eql(u8, open_tag_name, close_tag_name)) {
             return error.UnexpectedCloseTag;
         }

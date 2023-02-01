@@ -1,3 +1,5 @@
+const escape = @import("./escape.zig");
+
 const Self = @This();
 
 input: []const u8,
@@ -84,5 +86,76 @@ pub fn consumeWhitespace(self: *Self) []const u8 {
         }
 
         return self.input[start_offset..self.offset];
+    }
+}
+
+pub fn consumeOpenTagStart(self: *Self) !?[]const u8 {
+    var start_offset = self.offset;
+
+    if (!self.consumeChar('<')) {
+        self.offset = start_offset;
+        return null;
+    }
+
+    if (self.consumeChar('/')) {
+        self.offset = start_offset;
+        return null;
+    }
+
+    var tag_name = self.consumeUntilAny(" \t\n>");
+
+    // FIXME: Verify that the tag name is valid.
+
+    return tag_name;
+}
+
+pub fn consumeCloseTag(self: *Self) !?[]const u8 {
+    var start_offset = self.offset;
+
+    if (!self.consumeString("</")) {
+        self.offset = start_offset;
+        return null;
+    }
+
+    var tag_name = self.consumeUntil('>');
+
+    // FIXME: Verify that the tag name is valid.
+
+    if (!self.consumeChar('>')) {
+        self.offset = start_offset;
+        return error.InvalidTag;
+    }
+
+    return tag_name;
+}
+
+pub fn consumePlaceholder(self: *Self) !?[]const u8 {
+    var start_offset = self.offset;
+
+    if (!self.consumeChar('{')) {
+        self.offset = start_offset;
+        return null;
+    }
+
+    if (self.consumeChar('{')) {
+        @panic("caller should consume escaped braces");
+    }
+
+    var placeholder_name = self.consumeUntil('}');
+
+    // FIXME: Verify that the placeholder name is valid.
+
+    if (!self.consumeChar('}')) {
+        self.offset = start_offset;
+        return error.InvalidPlaceholder;
+    }
+
+    return placeholder_name;
+}
+
+pub fn consumeRawContent(self: *Self, context: escape.EscapeContext) []const u8 {
+    switch (context) {
+        .html_body => return self.consumeUntilAny("<{"),
+        .attribute_value => return self.consumeUntilAny("\"{"),
     }
 }
