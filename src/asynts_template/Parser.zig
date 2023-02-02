@@ -29,6 +29,19 @@ fn evaluateContents(
 
     while (try lexer.consumePlaceholder()) |placeholder_name|
     {
+        switch (context) {
+            .html_body => |tag| {
+                if (common.isDangerousTagName(tag.tag_name)) {
+                    return error.PlaceholderInDangerousContext;
+                }
+            },
+            .attribute_value => |attribute| {
+                if (common.isDangerousAttributeName(attribute.attribute_name)) {
+                    return error.PlaceholderInDangerousContext;
+                }
+            }
+        }
+
         if (variables == null) {
             return error.UnresolvedPlaceholder;
         }
@@ -55,7 +68,7 @@ fn evaluateAttribute(
         return false;
     }
 
-    try common.validateName(attribute_name, .attribute_name);
+    try common.validateName(attribute_name);
 
     // Include space that was consumed by caller of this function.
     try writer.print(" {s}", .{ attribute_name });
@@ -67,7 +80,7 @@ fn evaluateAttribute(
         }
         try writer.print("=\"", .{});
 
-        try evaluateContents(writer, lexer, variables, .attribute_value);
+        try evaluateContents(writer, lexer, variables, .{ .attribute_value = .{ .attribute_name = attribute_name } });
 
         if (!lexer.consumeChar('"')) {
             return error.InvalidAttribute;
@@ -115,7 +128,7 @@ fn evaluateTag(
     var open_tag_name = try evaluateOpenTag(writer, lexer, variables)
         orelse return false;
 
-    try evaluateContents(writer, lexer, variables, .html_body);
+    try evaluateContents(writer, lexer, variables, .{ .html_body = .{ .tag_name = open_tag_name } });
 
     if (try lexer.consumeCloseTag()) |close_tag_name| {
         if (!std.mem.eql(u8, open_tag_name, close_tag_name)) {
@@ -128,7 +141,7 @@ fn evaluateTag(
     }
 
     while (try evaluateTag(writer, lexer, variables)) {
-        try evaluateContents(writer, lexer, variables, .html_body);
+        try evaluateContents(writer, lexer, variables, .{ .html_body = .{ .tag_name = open_tag_name } });
     }
 
     if (try lexer.consumeCloseTag()) |close_tag_name| {
@@ -408,4 +421,32 @@ test "forbid invalid attribute name" {
         \\<foo Z="hello"></foo>
         , null
     ));
+}
+
+test "forbid placeholder in dangerous tag" {
+    var allocator = std.testing.allocator;
+
+    var variables = std.StringHashMap([]const u8).init(allocator);
+    defer variables.deinit();
+
+    try variables.put("xss", "alert(1)");
+
+    var actual = evaluate(allocator, "<script>{xss}</script>", &variables);
+
+    try std.testing.expectError(error.PlaceholderInDangerousContext, actual);
+}
+
+test "forbid placeholder in dangerous attribute" {
+    var allocator = std.testing.allocator;
+
+    var variables = std.StringHashMap([]const u8).init(allocator);
+    defer variables.deinit();
+
+    try variables.put("xss", "alert(1)");
+
+    var actual = evaluate(allocator,
+        \\<div onload="{xss}"></div>
+        , &variables);
+
+    try std.testing.expectError(error.PlaceholderInDangerousContext, actual);
 }

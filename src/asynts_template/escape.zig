@@ -28,9 +28,13 @@ fn writeEscapedIntoAttributeValue(writer: anytype, input: []const u8) !void {
     }
 }
 
-pub const EscapeContext = enum {
-    html_body,
-    attribute_value,
+pub const EscapeContext = union(enum) {
+    html_body: struct {
+        tag_name: []const u8,
+    },
+    attribute_value: struct {
+        attribute_name: []const u8,
+    },
 };
 pub fn writeEscaped(writer: anytype, input: []const u8, context: EscapeContext) !void {
     switch (context) {
@@ -51,7 +55,7 @@ pub fn escapeAlloc(allocator: std.mem.Allocator, input: []const u8, context: Esc
 test "escape in html body" {
     var allocator = std.testing.allocator;
 
-    var actual = try escapeAlloc(allocator, "<foo> &amp; x<<\"", .html_body);
+    var actual = try escapeAlloc(allocator, "<foo> &amp; x<<\"", .{ .html_body = .{ .tag_name = "example" } });
     defer allocator.free(actual);
 
     try std.testing.expectEqualStrings("&lt;foo&gt; &amp;amp; x&lt;&lt;\"", actual);
@@ -60,7 +64,7 @@ test "escape in html body" {
 test "escape in attribute value" {
     var allocator = std.testing.allocator;
 
-    var actual = try escapeAlloc(allocator, "<foo> &amp; x<<\"", .attribute_value);
+    var actual = try escapeAlloc(allocator, "<foo> &amp; x<<\"", .{ .attribute_value = .{ .attribute_name = "example"} });
     defer allocator.free(actual);
 
     try std.testing.expectEqualStrings("<foo> &amp;amp; x<<&quot;", actual);

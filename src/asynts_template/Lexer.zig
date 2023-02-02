@@ -104,7 +104,7 @@ pub fn consumeOpenTagStart(self: *Self) !?[]const u8 {
     }
 
     var tag_name = self.consumeUntilAny(" \t\n>");
-    try common.validateName(tag_name, .tag_name);
+    try common.validateName(tag_name);
 
     return tag_name;
 }
@@ -118,7 +118,7 @@ pub fn consumeCloseTag(self: *Self) !?[]const u8 {
     }
 
     var tag_name = self.consumeUntil('>');
-    try common.validateName(tag_name, .tag_name);
+    try common.validateName(tag_name);
 
     if (!self.consumeChar('>')) {
         self.offset = start_offset;

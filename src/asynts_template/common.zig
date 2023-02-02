@@ -2,7 +2,7 @@ const std = @import("std");
 
 // FIXME: Add error enum.
 
-const forbidden_tag_names = forbidden_tag_names: {
+const dangerous_tag_names = forbidden_tag_names: {
     var names = [_][]const u8{
         "script",
         "style",
@@ -13,11 +13,24 @@ const forbidden_tag_names = forbidden_tag_names: {
     break :forbidden_tag_names names;
 };
 
-pub const ValidationContext = enum {
-    tag_name,
-    attribute_name,
-};
-pub fn validateName(name: []const u8, context: ValidationContext) !void {
+pub fn isDangerousTagName(name: []const u8) bool {
+    if (std.sort.binarySearch([]const u8, name, &dangerous_tag_names, u8, std.mem.order) != null) {
+        return true;
+    }
+
+    return false;
+}
+
+pub fn isDangerousAttributeName(name: []const u8) bool {
+    // This includes stuff like 'online' but otherwise we might miss something.
+    if (std.mem.startsWith(u8, name, "on")) {
+        return true;
+    }
+
+    return false;
+}
+
+pub fn validateName(name: []const u8) !void {
     if (name.len == 0) {
         return error.InvalidName;
     }
@@ -50,48 +63,34 @@ pub fn validateName(name: []const u8, context: ValidationContext) !void {
             continue;
         }
     }
-
-    switch (context) {
-        .tag_name => {
-            if (std.sort.binarySearch([]const u8, name, &forbidden_tag_names, u8, std.mem.order) != null) {
-                return error.ForbiddenName;
-            }
-        },
-        .attribute_name => {
-            // This includes stuff like 'online' but otherwise we might miss something.
-            if (std.mem.startsWith(u8, name, "on")) {
-                return error.ForbiddenName;
-            }
-        },
-    }
 }
 
 test "reject uppercase" {
-    try std.testing.expectError(error.UppercaseCharacterInName, validateName("sCRIPT", .tag_name));
+    try std.testing.expectError(error.UppercaseCharacterInName, validateName("sCRIPT"));
 }
 
 test "reject dashes at start and end" {
-    try std.testing.expectError(error.InvalidName, validateName("-foo", .tag_name));
-    try std.testing.expectError(error.InvalidName, validateName("foo-", .tag_name));
-    try std.testing.expectError(error.InvalidName, validateName("-", .tag_name));
-    try std.testing.expectError(error.InvalidName, validateName("---", .tag_name));
+    try std.testing.expectError(error.InvalidName, validateName("-foo"));
+    try std.testing.expectError(error.InvalidName, validateName("foo-"));
+    try std.testing.expectError(error.InvalidName, validateName("-"));
+    try std.testing.expectError(error.InvalidName, validateName("---"));
 }
 
 test "reject double dash" {
-    try std.testing.expectError(error.InvalidName, validateName("foo--bar", .tag_name));
+    try std.testing.expectError(error.InvalidName, validateName("foo--bar"));
 }
 
 test "accept normal tag names" {
-    try validateName("div", .tag_name);
-    try validateName("foo-bar", .tag_name);
+    try validateName("div");
+    try validateName("foo-bar");
 }
 
-test "reject forbidden tag names" {
-    try std.testing.expectError(error.ForbiddenName, validateName("script", .tag_name));
-    try validateName("script", .attribute_name);
+test "dangerous tag name" {
+    try std.testing.expect(isDangerousTagName("script"));
+    try std.testing.expect(!isDangerousAttributeName("script"));
 }
 
-test "reject forbidden attribute names" {
-    try std.testing.expectError(error.ForbiddenName, validateName("onload", .attribute_name));
-    try validateName("onload", .tag_name);
+test "dangerous attribute name" {
+    try std.testing.expect(isDangerousAttributeName("onload"));
+    try std.testing.expect(!isDangerousTagName("onload"));
 }
