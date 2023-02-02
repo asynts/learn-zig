@@ -4,27 +4,29 @@ const std = @import("std");
 
 const dangerous_tag_names = dangerous_tag_names: {
     var names = [_][]const u8 {
+        // Allows direct injection of malicious code.
         "script",
         "style",
+
+        // Other less common elements that are considered dangerous.
+        "iframe",
+        "embed",
+        "applet",
+        "link",
+        "listing",
+        "meta",
+        "noscript",
+        "object",
+        "plaintext",
+        "xmp",
     };
 
     std.sort.sort([]const u8, &names, u8, std.mem.lessThan);
 
     break :dangerous_tag_names names;
 };
-
-const dangerous_attribute_names = dangerous_attribute_names: {
-    var names = [_][]const u8 {
-        // Anything with an URL can use 'javascript:' protocol.
-        "href",
-        "src",
-    };
-
-    std.sort.sort([]const u8, &names, u8, std.mem.lessThan);
-
-    break :dangerous_attribute_names names;
-};
-
+// We are simply trying to protect the developer.
+// There are surely ways to bypass this check.
 pub fn isDangerousTagName(name: []const u8) bool {
     if (std.sort.binarySearch([]const u8, name, &dangerous_tag_names, u8, std.mem.order) != null) {
         return true;
@@ -33,6 +35,43 @@ pub fn isDangerousTagName(name: []const u8) bool {
     return false;
 }
 
+const dangerous_attribute_names = dangerous_attribute_names: {
+    var names = [_][]const u8 {
+        // Do not allow the user to control style.
+        "style",
+
+        // Anything with an URL can use 'javascript:' protocol.
+        "href",
+        "src",
+
+        // Other less common things that can contain URLs.
+        "codebase",
+        "cite",
+        "background",
+        "action",
+        "longdesc",
+        "profile",
+        "usemap",
+        "classid",
+        "formaction",
+        "icon",
+        "manifest",
+        "formaction",
+        "poster",
+        "srcset",
+        "archive",
+        "content",
+
+        // Note that custom attributes like 'data-*' are still allowed.
+        "data",
+    };
+
+    std.sort.sort([]const u8, &names, u8, std.mem.lessThan);
+
+    break :dangerous_attribute_names names;
+};
+// We are simply trying to protect the developer.
+// There are surely ways to bypass this check.
 pub fn isDangerousAttributeName(name: []const u8) bool {
     // This includes stuff like 'online' but otherwise we might miss something.
     if (std.mem.startsWith(u8, name, "on")) {
