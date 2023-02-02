@@ -436,7 +436,7 @@ test "forbid placeholder in dangerous tag" {
     try std.testing.expectError(error.PlaceholderInDangerousContext, actual);
 }
 
-test "forbid placeholder in dangerous attribute" {
+test "forbid placeholder in 'on*' attribute" {
     var allocator = std.testing.allocator;
 
     var variables = std.StringHashMap([]const u8).init(allocator);
@@ -446,6 +446,21 @@ test "forbid placeholder in dangerous attribute" {
 
     var actual = evaluate(allocator,
         \\<div onload="{xss}"></div>
+        , &variables);
+
+    try std.testing.expectError(error.PlaceholderInDangerousContext, actual);
+}
+
+test "forbid placeholder in url attribute" {
+    var allocator = std.testing.allocator;
+
+    var variables = std.StringHashMap([]const u8).init(allocator);
+    defer variables.deinit();
+
+    try variables.put("xss", "javascript:alert(1)");
+
+    var actual = evaluate(allocator,
+        \\<div href="{xss}"></div>
         , &variables);
 
     try std.testing.expectError(error.PlaceholderInDangerousContext, actual);

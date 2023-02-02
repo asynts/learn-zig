@@ -2,15 +2,27 @@ const std = @import("std");
 
 // FIXME: Add error enum.
 
-const dangerous_tag_names = forbidden_tag_names: {
-    var names = [_][]const u8{
+const dangerous_tag_names = dangerous_tag_names: {
+    var names = [_][]const u8 {
         "script",
         "style",
     };
 
     std.sort.sort([]const u8, &names, u8, std.mem.lessThan);
 
-    break :forbidden_tag_names names;
+    break :dangerous_tag_names names;
+};
+
+const dangerous_attribute_names = dangerous_attribute_names: {
+    var names = [_][]const u8 {
+        // Anything with an URL can use 'javascript:' protocol.
+        "href",
+        "src",
+    };
+
+    std.sort.sort([]const u8, &names, u8, std.mem.lessThan);
+
+    break :dangerous_attribute_names names;
 };
 
 pub fn isDangerousTagName(name: []const u8) bool {
@@ -24,6 +36,10 @@ pub fn isDangerousTagName(name: []const u8) bool {
 pub fn isDangerousAttributeName(name: []const u8) bool {
     // This includes stuff like 'online' but otherwise we might miss something.
     if (std.mem.startsWith(u8, name, "on")) {
+        return true;
+    }
+
+    if (std.sort.binarySearch([]const u8, name, &dangerous_attribute_names, u8, std.mem.order) != null) {
         return true;
     }
 
