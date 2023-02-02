@@ -33,6 +33,7 @@ pub const EscapeContext = union(enum) {
         tag_name: []const u8,
     },
     attribute_value: struct {
+        tag_name: []const u8,
         attribute_name: []const u8,
     },
 };
@@ -64,7 +65,14 @@ test "escape in html body" {
 test "escape in attribute value" {
     var allocator = std.testing.allocator;
 
-    var actual = try escapeAlloc(allocator, "<foo> &amp; x<<\"", .{ .attribute_value = .{ .attribute_name = "example"} });
+    var escape_context = EscapeContext{
+        .attribute_value = .{
+            .attribute_name = "example",
+            .tag_name = "div",
+        },
+    };
+
+    var actual = try escapeAlloc(allocator, "<foo> &amp; x<<\"", escape_context);
     defer allocator.free(actual);
 
     try std.testing.expectEqualStrings("<foo> &amp;amp; x<<&quot;", actual);

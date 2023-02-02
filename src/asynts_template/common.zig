@@ -72,13 +72,17 @@ const dangerous_attribute_names = dangerous_attribute_names: {
 };
 // We are simply trying to protect the developer.
 // There are surely ways to bypass this check.
-pub fn isDangerousAttributeName(name: []const u8) bool {
+pub fn isDangerousAttributeName(attribute_name: []const u8, tag_name: []const u8) bool {
     // This includes stuff like 'online' but otherwise we might miss something.
-    if (std.mem.startsWith(u8, name, "on")) {
+    if (std.mem.startsWith(u8, attribute_name, "on")) {
         return true;
     }
 
-    if (std.sort.binarySearch([]const u8, name, &dangerous_attribute_names, u8, std.mem.order) != null) {
+    if (std.sort.binarySearch([]const u8, tag_name, &dangerous_tag_names, u8, std.mem.order) != null) {
+        return true;
+    }
+
+    if (std.sort.binarySearch([]const u8, attribute_name, &dangerous_attribute_names, u8, std.mem.order) != null) {
         return true;
     }
 
@@ -142,10 +146,10 @@ test "accept normal tag names" {
 
 test "dangerous tag name" {
     try std.testing.expect(isDangerousTagName("script"));
-    try std.testing.expect(!isDangerousAttributeName("script"));
+    try std.testing.expect(!isDangerousAttributeName("script", "div"));
 }
 
 test "dangerous attribute name" {
-    try std.testing.expect(isDangerousAttributeName("onload"));
+    try std.testing.expect(isDangerousAttributeName("onload", "div"));
     try std.testing.expect(!isDangerousTagName("onload"));
 }

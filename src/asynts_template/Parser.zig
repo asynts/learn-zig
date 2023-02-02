@@ -36,7 +36,7 @@ fn evaluateContents(
                 }
             },
             .attribute_value => |attribute| {
-                if (common.isDangerousAttributeName(attribute.attribute_name)) {
+                if (common.isDangerousAttributeName(attribute.attribute_name, attribute.tag_name)) {
                     return error.PlaceholderInDangerousContext;
                 }
             }
@@ -60,7 +60,8 @@ fn evaluateContents(
 fn evaluateAttribute(
     writer: anytype,
     lexer: *Lexer,
-    variables: ?*std.StringHashMap([]const u8)
+    variables: ?*std.StringHashMap([]const u8),
+    tag_name: []const u8,
 ) !bool {
     var attribute_name = lexer.consumeUntilAny("=> \t\n");
 
@@ -80,7 +81,14 @@ fn evaluateAttribute(
         }
         try writer.print("=\"", .{});
 
-        try evaluateContents(writer, lexer, variables, .{ .attribute_value = .{ .attribute_name = attribute_name } });
+        var escape_context = escape.EscapeContext{
+            .attribute_value = .{
+                .attribute_name = attribute_name,
+                .tag_name = tag_name,
+            },
+        };
+
+        try evaluateContents(writer, lexer, variables, escape_context);
 
         if (!lexer.consumeChar('"')) {
             return error.InvalidAttribute;
@@ -103,7 +111,7 @@ fn evaluateOpenTag(
 
     _ = lexer.consumeWhitespace();
 
-    while (try evaluateAttribute(writer, lexer, variables)) {
+    while (try evaluateAttribute(writer, lexer, variables, open_tag_name)) {
         if (lexer.consumeWhitespace().len == 0) {
             break;
         }
@@ -461,6 +469,21 @@ test "forbid placeholder in url attribute" {
 
     var actual = evaluate(allocator,
         \\<div href="{xss}"></div>
+        , &variables);
+
+    try std.testing.expectError(error.PlaceholderInDangerousContext, actual);
+}
+
+test "forbid placeholder in attribute of dangerous tag" {
+    var allocator = std.testing.allocator;
+
+    var variables = std.StringHashMap([]const u8).init(allocator);
+    defer variables.deinit();
+
+    try variables.put("example", "javascript:alert(1)");
+
+    var actual = evaluate(allocator,
+        \\<script example="{example}"></script>
         , &variables);
 
     try std.testing.expectError(error.PlaceholderInDangerousContext, actual);
