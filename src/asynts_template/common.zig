@@ -1,4 +1,7 @@
 const std = @import("std");
+const Lexer = @import("./Lexer.zig");
+const escape = @import("./escape.zig");
+const common = @import("./common.zig");
 
 // FIXME: Add error enum.
 
@@ -120,6 +123,25 @@ pub fn validateName(name: []const u8) !void {
 
             has_seen_dash = true;
             continue;
+        }
+    }
+}
+
+pub fn verifyPlaceholderSafeInContext(placeholder: Lexer.Placeholder, context: escape.EscapeContext) !void {
+    if (placeholder.mode == .trusted) {
+        return;
+    }
+
+    switch (context) {
+        .html_body => |tag| {
+            if (common.isDangerousTagName(tag.tag_name)) {
+                return error.PlaceholderInDangerousContext;
+            }
+        },
+        .attribute_value => |attribute| {
+            if (common.isDangerousAttributeName(attribute.attribute_name, attribute.tag_name)) {
+                return error.PlaceholderInDangerousContext;
+            }
         }
     }
 }

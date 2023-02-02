@@ -27,26 +27,15 @@ fn evaluateContents(
     var contents_1 = lexer.consumeRawContent(context);
     try writer.print("{s}", .{ contents_1 });
 
-    while (try lexer.consumePlaceholder()) |placeholder_name|
+    while (try lexer.consumePlaceholder()) |placeholder|
     {
-        switch (context) {
-            .html_body => |tag| {
-                if (common.isDangerousTagName(tag.tag_name)) {
-                    return error.PlaceholderInDangerousContext;
-                }
-            },
-            .attribute_value => |attribute| {
-                if (common.isDangerousAttributeName(attribute.attribute_name, attribute.tag_name)) {
-                    return error.PlaceholderInDangerousContext;
-                }
-            }
-        }
+        try common.verifyPlaceholderSafeInContext(placeholder, context);
 
         if (variables == null) {
             return error.UnresolvedPlaceholder;
         }
 
-        if (variables.?.get(placeholder_name)) |value| {
+        if (variables.?.get(placeholder.name)) |value| {
             try escape.writeEscaped(writer, value, context);
         } else {
             return error.UnresolvedPlaceholder;
@@ -487,4 +476,54 @@ test "forbid placeholder in attribute of dangerous tag" {
         , &variables);
 
     try std.testing.expectError(error.PlaceholderInDangerousContext, actual);
+}
+
+test "allow trusted placeholders in dangerous tag body" {
+    var allocator = std.testing.allocator;
+
+    var variables = std.StringHashMap([]const u8).init(allocator);
+    defer variables.deinit();
+
+    try variables.put("script", "alert(1)");
+
+    var actual = try evaluate(allocator, "<script>{script:trusted}</script>", &variables);
+    defer allocator.free(actual);
+
+    try std.testing.expectEqualStrings("<script>alert(1)</script>", actual);
+}
+
+test "allow trusted placeholders in dangerous attribute value" {
+    var allocator = std.testing.allocator;
+
+    var variables = std.StringHashMap([]const u8).init(allocator);
+    defer variables.deinit();
+
+    try variables.put("script", "alert(1)");
+
+    var actual = try evaluate(allocator,
+        \\<div onload="{script:trusted}"></div>
+        , &variables);
+    defer allocator.free(actual);
+
+    try std.testing.expectEqualStrings(
+        \\<div onload="alert(1)"></div>
+        , actual);
+}
+
+test "allow trusted placeholders in attribute of dangerous tag" {
+    var allocator = std.testing.allocator;
+
+    var variables = std.StringHashMap([]const u8).init(allocator);
+    defer variables.deinit();
+
+    try variables.put("script", "alert(1)");
+
+    var actual = try evaluate(allocator,
+        \\<script example="{script:trusted}"></script>
+        , &variables);
+    defer allocator.free(actual);
+
+    try std.testing.expectEqualStrings(
+        \\<script example="alert(1)"></script>
+        , actual);
 }

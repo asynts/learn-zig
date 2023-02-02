@@ -128,7 +128,15 @@ pub fn consumeCloseTag(self: *Self) !?[]const u8 {
     return tag_name;
 }
 
-pub fn consumePlaceholder(self: *Self) !?[]const u8 {
+pub const PlaceholderMode = enum {
+    default,
+    trusted,
+};
+pub const Placeholder = struct {
+    name: []const u8,
+    mode: PlaceholderMode,
+};
+pub fn consumePlaceholder(self: *Self) !?Placeholder {
     var start_offset = self.offset;
 
     if (!self.consumeChar('{')) {
@@ -140,16 +148,27 @@ pub fn consumePlaceholder(self: *Self) !?[]const u8 {
         @panic("caller should consume escaped braces");
     }
 
-    var placeholder_name = self.consumeUntil('}');
+    var placeholder_name = self.consumeUntilAny(":}");
+    try common.validateName(placeholder_name);
 
-    // FIXME: Verify that the placeholder name is valid.
+    var placeholder_mode = PlaceholderMode.default;
+    if (self.consumeChar(':')) {
+        if (self.consumeString("trusted")) {
+            placeholder_mode = .trusted;
+        } else {
+            return error.InvalidPlaceholder;
+        }
+    }
 
     if (!self.consumeChar('}')) {
         self.offset = start_offset;
         return error.InvalidPlaceholder;
     }
 
-    return placeholder_name;
+    return .{
+        .name = placeholder_name,
+        .mode = placeholder_mode,
+    };
 }
 
 pub fn consumeRawContent(self: *Self, context: escape.EscapeContext) []const u8 {
