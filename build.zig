@@ -21,6 +21,12 @@ pub fn build(b: *std.build.Builder) void {
     asynts_template_lib.setBuildMode(mode);
     asynts_template_lib.install();
 
+    var blog_exe = b.addExecutable("blog", "src/bin/blog.zig");
+    blog_exe.setTarget(target);
+    blog_exe.setBuildMode(mode);
+    blog_exe.addPackagePath("asynts-template", "src/asynts_template/lib.zig");
+    blog_exe.install();
+
     var tests_1 = b.addTest("src/asynts_template/lib.zig");
     tests_1.setTarget(target);
     tests_1.setBuildMode(mode);

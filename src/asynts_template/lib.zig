@@ -1,7 +1,7 @@
 const std = @import("std");
 
 const Lexer = @import("./Lexer.zig");
-const Parser = @import("./Parser.zig");
+pub const Parser = @import("./Parser.zig");
 
 pub const Generator = struct {
     const Self = @This();

@@ -20,10 +20,14 @@
 
 -   Consider adding support for XML.
 
--   Fix remaining bugs:
+-   Fix remaining bugs and tweaks:
 
     -   I don't think we parse `<style>` and `<script` correctly.
         What if there is an unterminated `/*` in there?
+
+    -   We do not allow `<example />` syntax.
+
+    -   We do not allow `&quot;` syntax.
 
 -   Remove technical debt:
 
@@ -34,6 +38,10 @@
 -   Do a proper security audit in the end.
 
     -   Beware of parser differentials.
+
+    -   Verify that we are escaping everything that is necessary.
+
+    -   Verify that I did not miss some elements.
 
     -   Write out a proper grammar and verify it.
 
