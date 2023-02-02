@@ -139,6 +139,10 @@ pub fn verifyPlaceholderSafeInContext(placeholder: Lexer.Placeholder, context: e
             }
         },
         .attribute_value => |attribute| {
+            if (placeholder.mode == .unescaped_html_body) {
+                return error.HtmlPlaceholderInAttributeValue;
+            }
+
             if (common.isDangerousAttributeName(attribute.attribute_name, attribute.tag_name)) {
                 return error.PlaceholderInDangerousContext;
             }

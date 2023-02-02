@@ -36,7 +36,13 @@ fn evaluateContents(
         }
 
         if (variables.?.get(placeholder.name)) |value| {
-            try escape.writeEscaped(writer, value, context);
+            switch (placeholder.mode) {
+                .trusted,
+                .untrusted => try escape.writeEscaped(writer, value, context),
+
+                .unescaped_html_body => try writer.print("{s}", .{ value }),
+            }
+
         } else {
             return error.UnresolvedPlaceholder;
         }
@@ -526,4 +532,33 @@ test "allow trusted placeholders in attribute of dangerous tag" {
     try std.testing.expectEqualStrings(
         \\<script example="alert(1)"></script>
         , actual);
+}
+
+test "allow unescaped html placeholder in html body" {
+    var allocator = std.testing.allocator;
+
+    var variables = std.StringHashMap([]const u8).init(allocator);
+    defer variables.deinit();
+
+    try variables.put("foo", "<div>already generated</div>");
+
+    var actual = try evaluate(allocator, "<div>{foo:html}</div>", &variables);
+    defer allocator.free(actual);
+
+    try std.testing.expectEqualStrings("<div><div>already generated</div></div>", actual);
+}
+
+test "forbid unescaped html placeholder in attribute value" {
+    var allocator = std.testing.allocator;
+
+    var variables = std.StringHashMap([]const u8).init(allocator);
+    defer variables.deinit();
+
+    try variables.put("foo", "foo");
+
+    var actual = evaluate(allocator,
+        \\<div example="{foo:html}"></div>
+        , &variables);
+
+    try std.testing.expectError(error.HtmlPlaceholderInAttributeValue, actual);
 }
