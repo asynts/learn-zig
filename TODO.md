@@ -16,4 +16,25 @@
 
 -   Unit test `Lexer`.
 
--   Parse some HTML / XML syntax at compile time.
+-   Parse some HTML syntax at compile time.
+
+-   Consider adding support for XML.
+
+-   Fix remaining bugs:
+
+    -   I don't think we parse `<style>` and `<script` correctly.
+        What if there is an unterminated `/*` in there?
+
+-   Remove technical debt:
+
+    -   Add one error enum that is used everywhere.
+
+    -   Add a reasonable amount of documentation.
+
+-   Do a proper security audit in the end.
+
+    -   Beware of parser differentials.
+
+    -   Write out a proper grammar and verify it.
+
+    -   Run a fuzzer on it.

@@ -69,6 +69,9 @@
 
 -   How to test if something is an error without checking for explicit error?
 
+-   In the standard library there are a ton of functions that end in `*Z`.
+    What are these functions used for?
+
 ### Closed
 
 -   Question: What are the general naming conventions for `snake_case` and `camelCase`?
