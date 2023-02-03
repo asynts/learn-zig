@@ -41,7 +41,7 @@ const Blog = struct {
         defer allocator.free(entries_html);
         try variables.put("entries_html", entries_html);
 
-        return try asynts_template.Parser.evaluate(
+        return try asynts_template.evaluateAlloc(
             allocator,
             \\<html>
             \\    <head>
@@ -88,7 +88,7 @@ const Entry = struct {
         defer allocator.free(comments_html);
         try variables.put("comments_html", comments_html);
 
-        return try asynts_template.Parser.evaluate(
+        return try asynts_template.evaluateAlloc(
             allocator,
             \\<div>
             \\    <h2>{title} (by {author})</h2>
@@ -127,7 +127,7 @@ const Comment = struct {
         defer allocator.free(comments_html);
         try variables.put("comments_html", comments_html);
 
-        return try asynts_template.Parser.evaluate(
+        return try asynts_template.evaluateAlloc(
             allocator,
             \\<div>
             \\    <div>{contents} &mdash; {author}</div>
@@ -151,7 +151,7 @@ const Tag = struct {
 
         try variables.put("name", self.name);
 
-        return try asynts_template.Parser.evaluate(
+        return try asynts_template.evaluateAlloc(
             allocator,
             \\<div>{name}</div>
             \\
