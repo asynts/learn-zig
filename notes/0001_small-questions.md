@@ -74,6 +74,24 @@
 
 -   Is there something like an efficient string builder?
 
+-   Why does the following not work?
+
+    ```zig
+    fn foo(comptime T: type) {
+
+    }
+
+    fn bar() {
+        // It does work with 'u8' though.
+        foo(const u8);
+    }
+    ```
+
+    Why is `const X` not considered a valid type?
+
+-   Somehow, if I use a recursive function that returns an error, I need to use `anyerror!` why is that?
+    What does it do?
+
 ### Closed
 
 -   Question: What are the general naming conventions for `snake_case` and `camelCase`?

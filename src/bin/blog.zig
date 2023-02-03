@@ -1,6 +1,21 @@
 const std = @import("std");
 const asynts_template = @import("asynts-template");
 
+// FIXME: This could be done more efficiently with a writer.
+fn mapSliceToHtml(allocator: std.mem.Allocator, comptime T: type, slice: []const T) anyerror![]const u8 {
+    var entries_html = std.ArrayList(u8).init(allocator);
+    defer entries_html.deinit();
+
+    for (slice) |entry| {
+        var entry_html = try entry.generateHtml(allocator);
+        defer allocator.free(entry_html);
+
+        try entries_html.appendSlice(entry_html);
+    }
+
+    return entries_html.toOwnedSlice();
+}
+
 const Blog = struct {
     const Self = @This();
 
@@ -13,17 +28,18 @@ const Blog = struct {
 
         try variables.put("title", self.title);
         try variables.put("entries_html", "FIXME");
+        try variables.put("style_css",
+            \\div {
+            \\    margin: 1px;
+            \\    padding: 1px;
+            \\    border: 1px solid black;
+            \\}
+            \\
+        );
 
-        // FIXME: This code is very redundant.
-        var entries_html = std.ArrayList(u8).init(allocator);
-        defer entries_html.deinit();
-        for (self.entries) |entry| {
-            var entry_html = try entry.generateHtml(allocator);
-            defer allocator.free(entry_html);
-
-            try entries_html.appendSlice(entry_html);
-        }
-        try variables.put("entries_html", entries_html.items);
+        var entries_html = try mapSliceToHtml(allocator, Entry, self.entries);
+        defer allocator.free(entries_html);
+        try variables.put("entries_html", entries_html);
 
         return try asynts_template.Parser.evaluate(
             allocator,
@@ -31,6 +47,7 @@ const Blog = struct {
             \\    <head>
             \\        <meta charset="utf-8"></meta>
             \\        <title>{title}</title>
+            \\        <style>{style_css:trusted}</style>
             \\    </head>
             \\    <body>
             \\        <h1>{title}</h1>
@@ -52,7 +69,7 @@ const Entry = struct {
     author: []const u8,
     title: []const u8,
     contents: []const u8,
-    tags: []const []const u8,
+    tags: []const Tag,
     comments: []const Comment,
 
     fn generateHtml(self: *const Self, allocator: std.mem.Allocator) ![]const u8 {
@@ -63,38 +80,13 @@ const Entry = struct {
         try variables.put("author", self.author);
         try variables.put("contents", self.contents);
 
-        // FIXME: This code is very redundant.
-        var tags_html = std.ArrayList(u8).init(allocator);
-        defer tags_html.deinit();
-        for (self.tags) |tag| {
-            var variables_2 = std.StringHashMap([]const u8).init(allocator);
-            defer variables_2.deinit();
+        var tags_html = try mapSliceToHtml(allocator, Tag, self.tags);
+        defer allocator.free(tags_html);
+        try variables.put("tags_html", tags_html);
 
-            try variables_2.put("tag", tag);
-
-            var tag_html = try asynts_template.Parser.evaluate(
-                allocator,
-                \\<div>{tag}</div>
-                \\
-                ,
-                &variables_2
-            );
-            defer allocator.free(tag_html);
-
-            try tags_html.appendSlice(tag_html);
-        }
-        try variables.put("tags_html", tags_html.items);
-
-        // FIXME: This code is very redundant.
-        var comments_html = std.ArrayList(u8).init(allocator);
-        defer comments_html.deinit();
-        for (self.comments) |comment| {
-            var comment_html = try comment.generateHtml(allocator);
-            defer allocator.free(comment_html);
-
-            try comments_html.appendSlice(comment_html);
-        }
-        try variables.put("comments_html", comments_html.items);
+        var comments_html = try mapSliceToHtml(allocator, Comment, self.comments);
+        defer allocator.free(comments_html);
+        try variables.put("comments_html", comments_html);
 
         return try asynts_template.Parser.evaluate(
             allocator,
@@ -131,16 +123,9 @@ const Comment = struct {
         try variables.put("author", self.author);
         try variables.put("contents", self.contents);
 
-        // FIXME: This code is very redundant.
-        var comments_html = std.ArrayList(u8).init(allocator);
-        defer comments_html.deinit();
-        for (self.comments) |comment| {
-            var comment_html = try comment.generateHtml(allocator);
-            defer allocator.free(comment_html);
-
-            try comments_html.appendSlice(comment_html);
-        }
-        try variables.put("comments_html", comments_html.items);
+        var comments_html = try mapSliceToHtml(allocator, Comment, self.comments);
+        defer allocator.free(comments_html);
+        try variables.put("comments_html", comments_html);
 
         return try asynts_template.Parser.evaluate(
             allocator,
@@ -151,6 +136,27 @@ const Comment = struct {
             \\
             ,
             &variables
+        );
+    }
+};
+
+const Tag = struct {
+    const Self = @This();
+
+    name: []const u8,
+
+    fn generateHtml(self: *const Self, allocator: std.mem.Allocator) ![]const u8 {
+        var variables = std.StringHashMap([]const u8).init(allocator);
+        defer variables.deinit();
+
+        try variables.put("name", self.name);
+
+        return try asynts_template.Parser.evaluate(
+            allocator,
+            \\<div>{name}</div>
+            \\
+            ,
+            &variables,
         );
     }
 };
@@ -173,8 +179,8 @@ pub fn main() !void {
                     \\Have a nice day.
                     \\
                 ,
-                .tags = &[_][]const u8{
-                    "hello",
+                .tags = &[_]Tag{
+                    Tag{ .name = "hello" },
                 },
                 .comments = &[_]Comment{
                     Comment{
@@ -195,9 +201,9 @@ pub fn main() !void {
                     \\&lt;script&gt;alert(3)&lt;/script&gt;
                     \\
                 ,
-                .tags = &[_][]const u8{
-                    "exploit",
-                    "xss",
+                .tags = &[_]Tag{
+                    Tag{ .name = "exploit" },
+                    Tag{ .name = "xss" },
                 },
                 .comments = &[_]Comment{
                     Comment{
