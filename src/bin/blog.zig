@@ -3,17 +3,16 @@ const asynts_template = @import("asynts-template");
 
 // FIXME: This could be done more efficiently with a writer.
 fn mapSliceToHtml(allocator: std.mem.Allocator, comptime T: type, slice: []const T) anyerror![]const u8 {
-    var entries_html = std.ArrayList(u8).init(allocator);
-    defer entries_html.deinit();
+    var buffer = std.ArrayList(u8).init(allocator);
+    defer buffer.deinit();
+
+    var writer = buffer.writer();
 
     for (slice) |entry| {
-        var entry_html = try entry.generateHtml(allocator);
-        defer allocator.free(entry_html);
-
-        try entries_html.appendSlice(entry_html);
+        try entry.writeHtml(writer, allocator);
     }
 
-    return entries_html.toOwnedSlice();
+    return buffer.toOwnedSlice();
 }
 
 const Blog = struct {
@@ -22,7 +21,7 @@ const Blog = struct {
     title: []const u8,
     entries: []const Entry,
 
-    fn generateHtml(self: *const Self, allocator: std.mem.Allocator) ![]const u8 {
+    fn writeHtml(self: *const Self, writer: anytype, allocator: std.mem.Allocator) !void {
         var variables = std.StringHashMap([]const u8).init(allocator);
         defer variables.deinit();
 
@@ -41,8 +40,8 @@ const Blog = struct {
         defer allocator.free(entries_html);
         try variables.put("entries_html", entries_html);
 
-        return try asynts_template.evaluateAlloc(
-            allocator,
+        try asynts_template.evaluate(
+            writer,
             \\<html>
             \\    <head>
             \\        <meta charset="utf-8"></meta>
@@ -61,6 +60,17 @@ const Blog = struct {
             &variables,
         );
     }
+
+    fn toHtmlOwned(self: *const Self, allocator: std.mem.Allocator) ![]const u8 {
+        var buffer = std.ArrayList(u8).init(allocator);
+        defer buffer.deinit();
+
+        var writer = buffer.writer();
+
+        try self.writeHtml(writer, allocator);
+
+        return buffer.toOwnedSlice();
+    }
 };
 
 const Entry = struct {
@@ -72,7 +82,7 @@ const Entry = struct {
     tags: []const Tag,
     comments: []const Comment,
 
-    fn generateHtml(self: *const Self, allocator: std.mem.Allocator) ![]const u8 {
+    fn writeHtml(self: *const Self, writer: anytype, allocator: std.mem.Allocator) !void {
         var variables = std.StringHashMap([]const u8).init(allocator);
         defer variables.deinit();
 
@@ -88,8 +98,8 @@ const Entry = struct {
         defer allocator.free(comments_html);
         try variables.put("comments_html", comments_html);
 
-        return try asynts_template.evaluateAlloc(
-            allocator,
+        try asynts_template.evaluate(
+            writer,
             \\<div>
             \\    <h2>{title} (by {author})</h2>
             \\    <div>
@@ -116,7 +126,7 @@ const Comment = struct {
     contents: []const u8,
     comments: []const Comment,
 
-    fn generateHtml(self: *const Self, allocator: std.mem.Allocator) ![]const u8 {
+    fn writeHtml(self: *const Self, writer: anytype, allocator: std.mem.Allocator) !void {
         var variables = std.StringHashMap([]const u8).init(allocator);
         defer variables.deinit();
 
@@ -127,8 +137,8 @@ const Comment = struct {
         defer allocator.free(comments_html);
         try variables.put("comments_html", comments_html);
 
-        return try asynts_template.evaluateAlloc(
-            allocator,
+        try asynts_template.evaluate(
+            writer,
             \\<div>
             \\    <div>{contents} &mdash; {author}</div>
             \\    <div>{comments_html:html}</div>
@@ -145,14 +155,14 @@ const Tag = struct {
 
     name: []const u8,
 
-    fn generateHtml(self: *const Self, allocator: std.mem.Allocator) ![]const u8 {
+    fn writeHtml(self: *const Self, writer: anytype, allocator: std.mem.Allocator) !void {
         var variables = std.StringHashMap([]const u8).init(allocator);
         defer variables.deinit();
 
         try variables.put("name", self.name);
 
-        return try asynts_template.evaluateAlloc(
-            allocator,
+        try asynts_template.evaluate(
+            writer,
             \\<div>{name}</div>
             \\
             ,
@@ -227,7 +237,7 @@ pub fn main() !void {
         },
     };
 
-    var result = try blog.generateHtml(allocator);
+    var result = try blog.toHtmlOwned(allocator);
     defer allocator.free(result);
     std.debug.print("{s}", .{ result });
 }
