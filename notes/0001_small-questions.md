@@ -2,8 +2,6 @@
 
 -   How to use `std.debug.print` with a boolean?
 
--   How to access the last element of `std.ArrayList`?
-
 -   Why is `std.ascii.startsWithCaseInsensitive` not listed in the API documentation?
     This seems to apply to other functions as well.
 
@@ -15,6 +13,8 @@
 
 -   I don't like `anytype`.
     Concepts were added to C++ for a reason.
+
+    -   Can we use `comptime` functions to define constraints for type parameters?
 
 -   What should I use instead of `std.debug.print` when I want to handle errors?
 
@@ -28,8 +28,6 @@
 
 -   Does `std.fmt.format` support type erasure or is this like inlining in fmtlib?
 
--   Can we use `comptime` functions to define constraints for type parameters?
-
 -   Why do people make the `global_memory_allocator` a global variable?
     I would put it into `main` instead?!
 
@@ -38,9 +36,6 @@
 -   Is there anything like `@must` to unwrap an error or panic?
     I suspect that `orelse unreachable` is meant for that?
     Does that provide a proper error trace?
-
--   What does `union(enum)` do?
-    Does this allow me to drop the redundant enums?
 
 -   How to register the tests in multiple or all files.
     Currently, I need to do something like this:
@@ -62,15 +57,10 @@
     -   It seems to automatically grab tests in all other included files.
         However, this seems to be a bit inconsistent, I should verify this.
 
--   When is `pub` applicable, in a compilation unit?
-
 -   How does Zig handle compilation units in general, what can be compiled in parallel.
     Does `build.zig` use parallelism?
 
 -   How to test if something is an error without checking for explicit error?
-
--   In the standard library there are a ton of functions that end in `*Z`.
-    What are these functions used for?
 
 -   Is there something like an efficient string builder?
 
@@ -94,79 +84,65 @@
 
 -   How to add an existing library as package in `build.zig`?
 
--   How to do polymorphism with Zig?
-    In C this can be done as follows:
-
-    ```c
-    struct HumanFunc {
-        int (*get_health)(struct Human*);
-    };
-
-    struct Human {
-        struct HumanFunc *vtable;
-
-        int m_health;
-    };
-    int human_get_health(struct Human *human) {
-        return human->m_health;
-    }
-    const struct HumanFunc human_vtable {
-        .get_health = human_get_health,
-    };
-    Human create_human(int health) {
-        return Human{
-            .m_health = health,
-            .vtable = &human_vtable,
-        };
-    }
-
-    struct Wizard {
-        struct Human super;
-
-        int m_energy_shield;
-    };
-    int wizard_get_health(struct Human *human) {
-        struct Wizard *wizard = (struct Wizard*)human;
-        return human->m_health + wizard->m_energy_shield;
-    }
-    const struct HumanFunc wizard_vtable {
-        .get_health = wizard_get_health,
-    };
-    Wizard create_wizard(int health, int energy_shield) {
-        return Wizard{
-            .super = Human{
-                .vtable = &wizard_vtable,
-                .m_health = health,
-            },
-            .m_energy_shield = energy_shield,
-        };
-    }
-    ```
-
-    I haven't tested this code, but it should work similar to this.
-    There are likely ways to take advantage of templates to implement this a bit easier.
-
 ### Closed
 
 -   Question: What are the general naming conventions for `snake_case` and `camelCase`?
 
-    Answer: There is an official style guide: https://ziglang.org/documentation/0.10.1/#Style-Guide
-    This was pointed out by Prajwal here: https://github.com/asynts/learn-zig/commit/0daee1ebc4bd6cbd5345bf96378e1aaef778c916#r98425724
+    -   There is an official style guide: https://ziglang.org/documentation/0.10.1/#Style-Guide
+        This was pointed out by Prajwal here: https://github.com/asynts/learn-zig/commit/0daee1ebc4bd6cbd5345bf96378e1aaef778c916#r98425724
 
 -   Question: How to check if an optional has a value without unwrapping it?
 
-    Answer: We can simply check for `null`:
-    ```zig
-    if (foo_opt == null) {
-        return;
-    }
-    ```
+    -   We can simply check for `null`:
+        ```zig
+        if (foo_opt == null) {
+            return;
+        }
+        ```
 
 -   Question: How can we evaluate an expression in a condition with at comptime?
 
-    Answer: Adding a `comptime` prefix works:
-    ```zig
-    if (comptime foo()) {
-        // ...
-    }
-    ```
+    -   Adding a `comptime` prefix works:
+        ```zig
+        if (comptime foo()) {
+            // ...
+        }
+        ```
+
+-   Question: How to access the last element of `std.ArrayList`?
+
+    -   The function is called `getLast` or `getLastOrNull`.
+
+-   Question: What does `union(enum)` do?
+
+    -   It allows us to use it in a switch case:
+        ```zig
+        const Foo = union(enum) {
+            x: i32,
+            y: f32,
+        };
+        fn example(foo: Foo) void {
+            switch (foo) {
+                .x => std.debug.print("integer\n", .{}),
+                .y => std.debug.print("float\n", .{}),
+            }
+        }
+        ```
+        This can not be done with `union` alone.
+
+-   Question: When is `pub` applicable, in a compilation unit?
+
+    -   It makes the declaration avaliable to reference from a different file than it is declared in.
+
+-   Question: How do the `*Z` functions in the standard library differ?
+
+    -   These functions accept zero terminated strings.
+
+-   Question: How to do polymorphism with Zig?
+
+    -   Simply manually create a vtable and put it into the structure.
+        Very similar how I would implement this in C.
+
+    -   `std.mem.Allocator` uses this exact pattern:
+
+        https://github.com/ziglang/zig/blob/03cdb4fb5853109e46bdc08d8a849a23780093ae/lib/std/mem/Allocator.zig
