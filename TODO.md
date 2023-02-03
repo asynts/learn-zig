@@ -25,6 +25,8 @@
     -   I don't think we parse `<style>` and `<script` correctly.
         What if there is an unterminated `/*` in there?
 
+        -   We also try to interpret `{` as placeholders which makes no sense.
+
     -   We do not allow `<example />` syntax.
 
     -   We do not allow `&quot;` syntax.

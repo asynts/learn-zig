@@ -92,6 +92,60 @@
 -   Somehow, if I use a recursive function that returns an error, I need to use `anyerror!` why is that?
     What does it do?
 
+-   How to add an existing library as package in `build.zig`?
+
+-   How to do polymorphism with Zig?
+    In C this can be done as follows:
+
+    ```c
+    struct HumanFunc {
+        int (*get_health)(struct Human*);
+    };
+
+    struct Human {
+        struct HumanFunc *vtable;
+
+        int m_health;
+    };
+    int human_get_health(struct Human *human) {
+        return human->m_health;
+    }
+    const struct HumanFunc human_vtable {
+        .get_health = human_get_health,
+    };
+    Human create_human(int health) {
+        return Human{
+            .m_health = health,
+            .vtable = &human_vtable,
+        };
+    }
+
+    struct Wizard {
+        struct Human super;
+
+        int m_energy_shield;
+    };
+    int wizard_get_health(struct Human *human) {
+        struct Wizard *wizard = (struct Wizard*)human;
+        return human->m_health + wizard->m_energy_shield;
+    }
+    const struct HumanFunc wizard_vtable {
+        .get_health = wizard_get_health,
+    };
+    Wizard create_wizard(int health, int energy_shield) {
+        return Wizard{
+            .super = Human{
+                .vtable = &wizard_vtable,
+                .m_health = health,
+            },
+            .m_energy_shield = energy_shield,
+        };
+    }
+    ```
+
+    I haven't tested this code, but it should work similar to this.
+    There are likely ways to take advantage of templates to implement this a bit easier.
+
 ### Closed
 
 -   Question: What are the general naming conventions for `snake_case` and `camelCase`?
