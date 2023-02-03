@@ -27,15 +27,20 @@ pub fn build(b: *std.build.Builder) void {
     blog_exe.addPackagePath("asynts-template", "src/asynts_template/lib.zig");
     blog_exe.install();
 
-    var tests_1 = b.addTest("src/asynts_template/lib.zig");
-    tests_1.setTarget(target);
-    tests_1.setBuildMode(mode);
-
-    var tests_2 = b.addTest("src/asynts_template/Parser.zig");
-    tests_2.setTarget(target);
-    tests_2.setBuildMode(mode);
+    var source_files = [_][]const u8{
+        "src/asynts_template/common.zig",
+        "src/asynts_template/escape.zig",
+        "src/asynts_template/Lexer.zig",
+        "src/asynts_template/lib.zig",
+        "src/asynts_template/Parser.zig",
+    };
 
     var test_step = b.step("test", "Run library tests");
-    test_step.dependOn(&tests_1.step);
-    test_step.dependOn(&tests_2.step);
+    for (source_files) |source_file| {
+        var tests = b.addTest(source_file);
+        tests.setTarget(target);
+        tests.setBuildMode(mode);
+
+        test_step.dependOn(&tests.step);
+    }
 }

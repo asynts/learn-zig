@@ -161,16 +161,11 @@ fn evaluateTag(
 }
 
 pub fn evaluate(
-    allocator: std.mem.Allocator,
+    writer: anytype,
     input: []const u8,
     variables: ?*std.StringHashMap([]const u8)
-) ![]const u8 {
+) !void {
     var lexer = Lexer.init(input);
-
-    var buffer = std.ArrayList(u8).init(allocator);
-    defer buffer.deinit();
-
-    var writer = buffer.writer();
 
     _ = lexer.consumeWhitespace();
 
@@ -194,6 +189,19 @@ pub fn evaluate(
     if (!lexer.isEnd()) {
         return error.CharactersOutsideOfTag;
     }
+}
+
+pub fn evaluateAlloc(
+    allocator: std.mem.Allocator,
+    input: []const u8,
+    variables: ?*std.StringHashMap([]const u8)
+) ![]const u8 {
+    var buffer = std.ArrayList(u8).init(allocator);
+    defer buffer.deinit();
+
+    var writer = buffer.writer();
+
+    try evaluate(writer, input, variables);
 
     return buffer.toOwnedSlice();
 }
@@ -202,7 +210,7 @@ test "simple tag working" {
     var allocator = std.testing.allocator;
     var input = "<foo>x</foo>";
 
-    var actual = try evaluate(allocator, input, null);
+    var actual = try evaluateAlloc(allocator, input, null);
     defer allocator.free(actual);
 
     try std.testing.expectEqualStrings("<foo>x</foo>", actual);
@@ -212,7 +220,7 @@ test "nested tags accepted" {
     var allocator = std.testing.allocator;
     var input = "<foo><bar></bar></foo>";
 
-    var actual = try evaluate(allocator, input, null);
+    var actual = try evaluateAlloc(allocator, input, null);
     defer allocator.free(actual);
 
     try std.testing.expectEqualStrings("<foo><bar></bar></foo>", actual);
@@ -222,7 +230,7 @@ test "inline text included in output" {
     var allocator = std.testing.allocator;
     var input = "<foo>x<bar>y</bar>z</foo>";
 
-    var actual = try evaluate(allocator, input, null);
+    var actual = try evaluateAlloc(allocator, input, null);
     defer allocator.free(actual);
 
     try std.testing.expectEqualStrings("<foo>x<bar>y</bar>z</foo>", actual);
@@ -232,7 +240,7 @@ test "forbid incorrect close tag" {
     var allocator = std.testing.allocator;
     var input = "<foo></bar>";
 
-    var actual = evaluate(allocator, input, null);
+    var actual = evaluateAlloc(allocator, input, null);
 
     try std.testing.expectError(error.UnexpectedCloseTag, actual);
 }
@@ -241,7 +249,7 @@ test "forbid characters before tag" {
     var allocator = std.testing.allocator;
     var input = "x<foo></foo>";
 
-    var actual = evaluate(allocator, input, null);
+    var actual = evaluateAlloc(allocator, input, null);
 
     try std.testing.expectError(error.CharactersOutsideOfTag, actual);
 }
@@ -250,7 +258,7 @@ test "forbid characters after tag" {
     var allocator = std.testing.allocator;
     var input = "<foo></foo>x";
 
-    var actual = evaluate(allocator, input, null);
+    var actual = evaluateAlloc(allocator, input, null);
 
     try std.testing.expectError(error.CharactersOutsideOfTag, actual);
 }
@@ -259,7 +267,7 @@ test "discard surrounding whitespace" {
     var allocator = std.testing.allocator;
     var input = " <foo></foo> ";
 
-    var actual = try evaluate(allocator, input, null);
+    var actual = try evaluateAlloc(allocator, input, null);
     defer allocator.free(actual);
 
     try std.testing.expectEqualStrings("<foo></foo>", actual);
@@ -269,7 +277,7 @@ test "preserve whitespace in tags" {
     var allocator = std.testing.allocator;
     var input = "<foo> <bar>  </bar> x </foo> ";
 
-    var actual = try evaluate(allocator, input, null);
+    var actual = try evaluateAlloc(allocator, input, null);
     defer allocator.free(actual);
 
     try std.testing.expectEqualStrings("<foo> <bar>  </bar> x </foo>", actual);
@@ -285,7 +293,7 @@ test "lookup placeholders" {
     try variables.put("world", "world");
     try variables.put("hello", "Hello");
 
-    var actual = try evaluate(allocator, input, &variables);
+    var actual = try evaluateAlloc(allocator, input, &variables);
     defer allocator.free(actual);
 
     try std.testing.expectEqualStrings("<foo>Hello, world!</foo>", actual);
@@ -300,7 +308,7 @@ test "error if placeholder unknown" {
 
     try variables.put("example", "This is an example!");
 
-    var actual = evaluate(allocator, input, &variables);
+    var actual = evaluateAlloc(allocator, input, &variables);
 
     try std.testing.expectError(error.UnresolvedPlaceholder, actual);
 }
@@ -309,7 +317,7 @@ test "error if no placeholders provided" {
     var allocator = std.testing.allocator;
     var input = "<foo>{hello}</foo>";
 
-    var actual = evaluate(allocator, input, null);
+    var actual = evaluateAlloc(allocator, input, null);
 
     try std.testing.expectError(error.UnresolvedPlaceholder, actual);
 }
@@ -323,7 +331,7 @@ test "escape in html body" {
 
     try variables.put("hello", "<script>alert(1)</script> &");
 
-    var actual = try evaluate(allocator, input, &variables);
+    var actual = try evaluateAlloc(allocator, input, &variables);
     defer allocator.free(actual);
 
     try std.testing.expectEqualStrings("<foo>&lt;script&gt;alert(1)&lt;/script&gt; &amp;!</foo>", actual);
@@ -335,7 +343,7 @@ test "trivial attribute" {
         \\<foo x="42"></foo>
         ;
 
-    var actual = try evaluate(allocator, input, null);
+    var actual = try evaluateAlloc(allocator, input, null);
     defer allocator.free(actual);
 
     try std.testing.expectEqualStrings(
@@ -351,7 +359,7 @@ test "basic attribute support" {
         \\</foo>
         ;
 
-    var actual = try evaluate(allocator, input, null);
+    var actual = try evaluateAlloc(allocator, input, null);
     defer allocator.free(actual);
 
     try std.testing.expectEqualStrings(
@@ -365,7 +373,7 @@ test "persist final newline" {
     var allocator = std.testing.allocator;
     var input = "<foo></foo> \n ";
 
-    var actual = try evaluate(allocator, input, null);
+    var actual = try evaluateAlloc(allocator, input, null);
     defer allocator.free(actual);
 
     try std.testing.expectEqualStrings("<foo></foo>\n", actual);
@@ -377,7 +385,7 @@ test "attributes without values" {
         \\<foo x y="42" z></foo>
         ;
 
-    var actual = try evaluate(allocator, input, null);
+    var actual = try evaluateAlloc(allocator, input, null);
     defer allocator.free(actual);
 
     try std.testing.expectEqualStrings(
@@ -396,7 +404,7 @@ test "trivial attribute with placeholder" {
 
     try variables.put("example", "quote='\"' & script='<script>alert(1)</script>'");
 
-    var actual = try evaluate(allocator, input, &variables);
+    var actual = try evaluateAlloc(allocator, input, &variables);
     defer allocator.free(actual);
 
     try std.testing.expectEqualStrings(
@@ -407,20 +415,20 @@ test "trivial attribute with placeholder" {
 test "forbid invalid tag name" {
     var allocator = std.testing.allocator;
 
-    try std.testing.expectError(error.InvalidName, evaluate(allocator, "<foo-></foo->", null));
-    try std.testing.expectError(error.InvalidName, evaluate(allocator, "<-foo></-foo>", null));
-    try std.testing.expectError(error.UppercaseCharacterInName, evaluate(allocator, "<scripT></scripT>", null));
-    try std.testing.expectError(error.InvalidName, evaluate(allocator, "<foo--bar></foo--bar>", null));
+    try std.testing.expectError(error.InvalidName, evaluateAlloc(allocator, "<foo-></foo->", null));
+    try std.testing.expectError(error.InvalidName, evaluateAlloc(allocator, "<-foo></-foo>", null));
+    try std.testing.expectError(error.UppercaseCharacterInName, evaluateAlloc(allocator, "<scripT></scripT>", null));
+    try std.testing.expectError(error.InvalidName, evaluateAlloc(allocator, "<foo--bar></foo--bar>", null));
 }
 
 test "forbid invalid attribute name" {
     var allocator = std.testing.allocator;
 
-    try std.testing.expectError(error.InvalidName, evaluate(allocator,
+    try std.testing.expectError(error.InvalidName, evaluateAlloc(allocator,
         \\<foo x="42" y-="1"></foo>
         , null
     ));
-    try std.testing.expectError(error.UppercaseCharacterInName, evaluate(allocator,
+    try std.testing.expectError(error.UppercaseCharacterInName, evaluateAlloc(allocator,
         \\<foo Z="hello"></foo>
         , null
     ));
@@ -434,7 +442,7 @@ test "forbid placeholder in dangerous tag" {
 
     try variables.put("xss", "alert(1)");
 
-    var actual = evaluate(allocator, "<script>{xss}</script>", &variables);
+    var actual = evaluateAlloc(allocator, "<script>{xss}</script>", &variables);
 
     try std.testing.expectError(error.PlaceholderInDangerousContext, actual);
 }
@@ -447,7 +455,7 @@ test "forbid placeholder in 'on*' attribute" {
 
     try variables.put("xss", "alert(1)");
 
-    var actual = evaluate(allocator,
+    var actual = evaluateAlloc(allocator,
         \\<div onload="{xss}"></div>
         , &variables);
 
@@ -462,7 +470,7 @@ test "forbid placeholder in url attribute" {
 
     try variables.put("xss", "javascript:alert(1)");
 
-    var actual = evaluate(allocator,
+    var actual = evaluateAlloc(allocator,
         \\<div href="{xss}"></div>
         , &variables);
 
@@ -477,7 +485,7 @@ test "forbid placeholder in attribute of dangerous tag" {
 
     try variables.put("example", "javascript:alert(1)");
 
-    var actual = evaluate(allocator,
+    var actual = evaluateAlloc(allocator,
         \\<script example="{example}"></script>
         , &variables);
 
@@ -492,7 +500,7 @@ test "allow trusted placeholders in dangerous tag body" {
 
     try variables.put("script", "alert(1)");
 
-    var actual = try evaluate(allocator, "<script>{script:trusted}</script>", &variables);
+    var actual = try evaluateAlloc(allocator, "<script>{script:trusted}</script>", &variables);
     defer allocator.free(actual);
 
     try std.testing.expectEqualStrings("<script>alert(1)</script>", actual);
@@ -506,7 +514,7 @@ test "allow trusted placeholders in dangerous attribute value" {
 
     try variables.put("script", "alert(1)");
 
-    var actual = try evaluate(allocator,
+    var actual = try evaluateAlloc(allocator,
         \\<div onload="{script:trusted}"></div>
         , &variables);
     defer allocator.free(actual);
@@ -524,7 +532,7 @@ test "allow trusted placeholders in attribute of dangerous tag" {
 
     try variables.put("script", "alert(1)");
 
-    var actual = try evaluate(allocator,
+    var actual = try evaluateAlloc(allocator,
         \\<script example="{script:trusted}"></script>
         , &variables);
     defer allocator.free(actual);
@@ -542,7 +550,7 @@ test "allow unescaped html placeholder in html body" {
 
     try variables.put("foo", "<div>already generated</div>");
 
-    var actual = try evaluate(allocator, "<div>{foo:html}</div>", &variables);
+    var actual = try evaluateAlloc(allocator, "<div>{foo:html}</div>", &variables);
     defer allocator.free(actual);
 
     try std.testing.expectEqualStrings("<div><div>already generated</div></div>", actual);
@@ -556,7 +564,7 @@ test "forbid unescaped html placeholder in attribute value" {
 
     try variables.put("foo", "foo");
 
-    var actual = evaluate(allocator,
+    var actual = evaluateAlloc(allocator,
         \\<div example="{foo:html}"></div>
         , &variables);
 
