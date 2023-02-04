@@ -58,7 +58,7 @@ fn evaluateAttribute(
     variables: ?*std.StringHashMap([]const u8),
     tag_name: []const u8,
 ) !bool {
-    var attribute_name = lexer.consumeUntilAny("=> \t\n");
+    var attribute_name = lexer.consumeUntilAny("=> /\t\n");
 
     if (attribute_name.len == 0) {
         return false;
@@ -94,10 +94,60 @@ fn evaluateAttribute(
     return true;
 }
 
+fn evaluateAssumeInlineTag(
+    writer: anytype,
+    lexer: *Lexer,
+    variables: ?*std.StringHashMap([]const u8),
+) !bool {
+    var tag_name = try lexer.consumeOpenTagStart()
+        orelse return false;
+
+    try writer.print("<{s}", .{ tag_name });
+
+    _ = lexer.consumeWhitespace();
+
+    while (try evaluateAttribute(writer, lexer, variables, tag_name)) {
+        if (lexer.consumeWhitespace().len == 0) {
+            break;
+        }
+    }
+
+    _ = lexer.consumeWhitespace();
+
+    if (!lexer.consumeString("/>")) {
+        return false;
+    }
+    try writer.print(" />", .{});
+
+    return true;
+}
+
+fn evaluateInlineTag(
+    writer: anytype,
+    lexer: *Lexer,
+    variables: ?*std.StringHashMap([]const u8),
+) !bool {
+    var start_offset = lexer.offset;
+
+    // First, we simulate evaluating that tag with 'null_writer'.
+    // Then we actually evaluate it with 'writer'.
+    // This is unfortunately necessary, because we did not clearly separate parsing and evaluating.
+    if (try evaluateAssumeInlineTag(std.io.null_writer, lexer, variables)) {
+        lexer.offset = start_offset;
+        var consumed = try evaluateAssumeInlineTag(writer, lexer, variables);
+        std.debug.assert(consumed);
+
+        return true;
+    } else {
+        lexer.offset = start_offset;
+        return false;
+    }
+}
+
 fn evaluateOpenTag(
     writer: anytype,
     lexer: *Lexer,
-    variables: ?*std.StringHashMap([]const u8)
+    variables: ?*std.StringHashMap([]const u8),
 ) !?[]const u8 {
     var open_tag_name = try lexer.consumeOpenTagStart()
         orelse return null;
@@ -128,6 +178,10 @@ fn evaluateTag(
     lexer: *Lexer,
     variables: ?*std.StringHashMap([]const u8),
 ) !bool {
+    if (try evaluateInlineTag(writer, lexer, variables)) {
+        return true;
+    }
+
     var open_tag_name = try evaluateOpenTag(writer, lexer, variables)
         orelse return false;
 
@@ -569,4 +623,24 @@ test "forbid unescaped html placeholder in attribute value" {
         , &variables);
 
     try std.testing.expectError(error.HtmlPlaceholderInAttributeValue, actual);
+}
+
+test "parse inline tag" {
+    var allocator = std.testing.allocator;
+
+    var variables = std.StringHashMap([]const u8).init(allocator);
+    defer variables.deinit();
+
+    try variables.put("charset", "utf-8");
+
+    var actual = try evaluateAlloc(allocator,
+        \\<meta charset="{charset:trusted}" />
+        , &variables);
+    defer allocator.free(actual);
+
+    try std.testing.expectEqualStrings(
+        \\<meta charset="utf-8" />
+        ,
+        actual,
+    );
 }

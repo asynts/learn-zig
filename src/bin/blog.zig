@@ -44,7 +44,7 @@ const Blog = struct {
             writer,
             \\<html>
             \\    <head>
-            \\        <meta charset="utf-8"></meta>
+            \\        <meta charset="utf-8" />
             \\        <title>{title}</title>
             \\        <style>{style_css:trusted}</style>
             \\    </head>
