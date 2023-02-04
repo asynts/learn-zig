@@ -146,3 +146,10 @@
     -   `std.mem.Allocator` uses this exact pattern:
 
         https://github.com/ziglang/zig/blob/03cdb4fb5853109e46bdc08d8a849a23780093ae/lib/std/mem/Allocator.zig
+
+-   Questions: Is it possible to allocate memory during `comptime` with `std.heap.FixedBufferAllocator`?
+
+    -   The implementation of `std.mem.Allocator` uses `@returnAddress` everywhere.
+        That can not work at compile time.
+
+    -   This may be resolved in 0.11.0 but it hasn't been implemented yet.

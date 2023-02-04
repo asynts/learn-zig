@@ -47,16 +47,19 @@
         output Attribute(.name = id_1, .value = value_1)
         ;
 
-    # FIXME: Deal with placeholders here.
     attributeString =
-        input  value_1:([^"]*)
-        output value_1
+        input  values:[^"]* (values:placeholder values:[^"]*)
+        output String(.values = values, .context = .attribute_value)
         ;
 
-    # FIXME: Deal with placeholders here.
     bodyString =
-        input  value_1:([^<>]*)
-        output value_1
+        input  values:[^<>]* (values:placeholder values:[^<>]*)
+        output String(.values = values, .context = .body)
+        ;
+
+    placeholder =
+        input  '{' id_1:identifier (':' mode_1:('trusted'|'html'))? '}'
+        output Placeholder(.name = id_1, .mode = mode_1)
         ;
     ```
 
