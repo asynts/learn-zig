@@ -94,13 +94,20 @@ fn evaluateAttribute(
     return true;
 }
 
-fn evaluateAssumeInlineTag(
+const OpenTag = struct {
+    tag_name: []const u8,
+    type_: enum {
+        body_tag,
+        inline_tag,
+    },
+};
+fn evaluateOpenTag(
     writer: anytype,
     lexer: *Lexer,
     variables: ?*std.StringHashMap([]const u8),
-) !bool {
+) !?OpenTag {
     var tag_name = try lexer.consumeOpenTagStart()
-        orelse return false;
+        orelse return null;
 
     try writer.print("<{s}", .{ tag_name });
 
@@ -114,63 +121,23 @@ fn evaluateAssumeInlineTag(
 
     _ = lexer.consumeWhitespace();
 
-    if (!lexer.consumeString("/>")) {
-        return false;
-    }
-    try writer.print(" />", .{});
-
-    return true;
-}
-
-fn evaluateInlineTag(
-    writer: anytype,
-    lexer: *Lexer,
-    variables: ?*std.StringHashMap([]const u8),
-) !bool {
-    var start_offset = lexer.offset;
-
-    // First, we simulate evaluating that tag with 'null_writer'.
-    // Then we actually evaluate it with 'writer'.
-    // This is unfortunately necessary, because we did not clearly separate parsing and evaluating.
-    if (try evaluateAssumeInlineTag(std.io.null_writer, lexer, variables)) {
-        lexer.offset = start_offset;
-        var consumed = try evaluateAssumeInlineTag(writer, lexer, variables);
-        std.debug.assert(consumed);
-
-        return true;
-    } else {
-        lexer.offset = start_offset;
-        return false;
-    }
-}
-
-fn evaluateOpenTag(
-    writer: anytype,
-    lexer: *Lexer,
-    variables: ?*std.StringHashMap([]const u8),
-) !?[]const u8 {
-    var open_tag_name = try lexer.consumeOpenTagStart()
-        orelse return null;
-
-    try writer.print("<{s}", .{ open_tag_name });
-
-    _ = lexer.consumeWhitespace();
-
-    while (try evaluateAttribute(writer, lexer, variables, open_tag_name)) {
-        if (lexer.consumeWhitespace().len == 0) {
-            break;
-        }
+    if (lexer.consumeString("/>")) {
+        try writer.print(" />", .{});
+        return .{
+            .tag_name = tag_name,
+            .type_ = .inline_tag,
+        };
     }
 
-    _ = lexer.consumeWhitespace();
-
-    if (!lexer.consumeChar('>')) {
-        std.debug.print("evaluateOpenTag: remaining='{s}'\n", .{lexer.remaining()});
-        return error.InvalidTag;
+    if (lexer.consumeChar('>')) {
+        try writer.print(">", .{});
+        return .{
+            .tag_name = tag_name,
+            .type_ = .body_tag,
+        };
     }
-    try writer.print(">", .{});
 
-    return open_tag_name;
+    return error.InvalidTag;
 }
 
 fn evaluateTag(
@@ -178,17 +145,17 @@ fn evaluateTag(
     lexer: *Lexer,
     variables: ?*std.StringHashMap([]const u8),
 ) !bool {
-    if (try evaluateInlineTag(writer, lexer, variables)) {
+    var open_tag = try evaluateOpenTag(writer, lexer, variables)
+        orelse return false;
+
+    if (open_tag.type_ == .inline_tag) {
         return true;
     }
 
-    var open_tag_name = try evaluateOpenTag(writer, lexer, variables)
-        orelse return false;
-
-    try evaluateContents(writer, lexer, variables, .{ .html_body = .{ .tag_name = open_tag_name } });
+    try evaluateContents(writer, lexer, variables, .{ .html_body = .{ .tag_name = open_tag.tag_name } });
 
     if (try lexer.consumeCloseTag()) |close_tag_name| {
-        if (!std.mem.eql(u8, open_tag_name, close_tag_name)) {
+        if (!std.mem.eql(u8, open_tag.tag_name, close_tag_name)) {
             return error.UnexpectedCloseTag;
         }
 
@@ -198,11 +165,11 @@ fn evaluateTag(
     }
 
     while (try evaluateTag(writer, lexer, variables)) {
-        try evaluateContents(writer, lexer, variables, .{ .html_body = .{ .tag_name = open_tag_name } });
+        try evaluateContents(writer, lexer, variables, .{ .html_body = .{ .tag_name = open_tag.tag_name } });
     }
 
     if (try lexer.consumeCloseTag()) |close_tag_name| {
-        if (!std.mem.eql(u8, open_tag_name, close_tag_name)) {
+        if (!std.mem.eql(u8, open_tag.tag_name, close_tag_name)) {
             return error.UnexpectedCloseTag;
         }
 
