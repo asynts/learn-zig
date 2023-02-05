@@ -20,6 +20,8 @@
 
 -   Consider adding support for XML.
 
+    -   By dropping support for HTML, I could greatly simplify the library.
+
 -   Fix remaining bugs and tweaks:
 
     -   I don't think we parse `<style>` and `<script` correctly.
@@ -27,7 +29,8 @@
 
         -   We also try to interpret `{` as placeholders which makes no sense.
 
-    -   We do not allow `<example />` syntax.
+        -   Maybe I can just allow `<script>{script:trusted}</script>` and nothing else?
+            Or I could forbid anything other than `<script src="whatever.js"></script>`.
 
     -   We do not allow `&quot;` syntax.
 

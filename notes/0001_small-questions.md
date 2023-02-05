@@ -84,6 +84,20 @@
 
 -   How to add an existing library as package in `build.zig`?
 
+-   How to do dependency injection effectively in Zig?
+
+    -   This could be done with function pointers, but that is a lot of boilerplate.
+        In my opinion, there should be support for simple traits.
+
+        Like the first field of the structure contains a type id which is looked up in some table to find the functions.
+
+-   How to propagate error information to the caller.
+
+    -   There seems to be a proposal for `union(error)` which seems to address this issue, but that's still early.
+
+    -   It would also be interesting if there is some way to get access to the AST of a `comptime` parameter.
+        That would allow generating proper error messages that could be feed into `@compileError`.
+
 ### Closed
 
 -   Question: What are the general naming conventions for `snake_case` and `camelCase`?
