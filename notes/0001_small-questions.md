@@ -84,19 +84,17 @@
 
 -   How to add an existing library as package in `build.zig`?
 
--   How to do dependency injection effectively in Zig?
-
-    -   This could be done with function pointers, but that is a lot of boilerplate.
-        In my opinion, there should be support for simple traits.
-
-        Like the first field of the structure contains a type id which is looked up in some table to find the functions.
-
 -   How to propagate error information to the caller.
 
     -   There seems to be a proposal for `union(error)` which seems to address this issue, but that's still early.
 
     -   It would also be interesting if there is some way to get access to the AST of a `comptime` parameter.
         That would allow generating proper error messages that could be feed into `@compileError`.
+
+-   Suppose, I fix a bug where an error wasn't handled correctly.
+    In Zig that would be a breaking change, since the error enum changes.
+
+    -   Is this good or bad, I can't tell?
 
 ### Closed
 
@@ -167,3 +165,35 @@
         That can not work at compile time.
 
     -   This may be resolved in 0.11.0 but it hasn't been implemented yet.
+
+-   Question: How to deal with optional-optional values, e.g. when forwarding values from another function call?
+
+    -   This can be done by first assigning it to a value:
+
+        ```zig
+        fn foo_1() ??i32 {
+            // Return inner null.
+            var value: ?i32 = null;
+            return value;
+        }
+
+        fn foo_2() ??i32 {
+            // Return outer null.
+            return null;
+        }
+        ```
+
+-   Question: How to do dependency injection in Zig?
+
+    -   This can be done by using templates:
+
+        ```zig
+        fn ExampleServiceImpl(comptime LogService: type) type {
+            // ...
+        }
+
+        const ExampleService = ExampleServiceImpl(LogService);
+        ```
+
+    -   If necessary, this can be done by manually creating a structure of function pointers that is kept along or inside the structure.
+        This is done in the `std.mem.Allocator` implementation.
