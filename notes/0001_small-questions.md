@@ -96,6 +96,13 @@
 
     -   Is this good or bad, I can't tell?
 
+-   How to associate values with an error in Zig?
+
+    -   For example the line and column numbers.
+        Can this be integrated into the `try` syntax?
+
+    -   https://github.com/ziglang/zig/issues/2647
+
 ### Closed
 
 -   Question: What are the general naming conventions for `snake_case` and `camelCase`?
